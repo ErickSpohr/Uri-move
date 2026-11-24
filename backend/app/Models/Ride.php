@@ -1,0 +1,103 @@
+<?php
+
+namespace App\Models;
+
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+#[Fillable([
+    'driver_id', 'vehicle_id', 'origin', 'origin_lat', 'origin_lng',
+    'destination', 'destination_lat', 'destination_lng',
+    'departure_date', 'departure_time', 'total_seats', 'available_seats',
+    'price', 'status', 'notes', 'is_recurring',
+])]
+class Ride extends Model
+{
+    use HasFactory;
+
+    public const STATUS_SCHEDULED = 'scheduled';
+
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
+    protected function casts(): array
+    {
+        return [
+            'departure_date' => 'date',
+            'total_seats' => 'integer',
+            'available_seats' => 'integer',
+            'price' => 'decimal:2',
+            'is_recurring' => 'boolean',
+            'origin_lat' => 'decimal:8',
+            'origin_lng' => 'decimal:8',
+            'destination_lat' => 'decimal:8',
+            'destination_lng' => 'decimal:8',
+        ];
+    }
+
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_id');
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class);
+    }
+
+    public function requests(): HasMany
+    {
+        return $this->hasMany(RideRequest::class);
+    }
+
+    public function pendingRequests(): HasMany
+    {
+        return $this->hasMany(RideRequest::class)->where('status', RideRequest::STATUS_PENDING);
+    }
+
+    public function passengers(): HasMany
+    {
+        return $this->hasMany(RidePassenger::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function location(): HasOne
+    {
+        return $this->hasOne(RideLocation::class);
+    }
+
+    public function canUseChat(User $user): bool
+    {
+        return $this->driver_id === $user->id || $this->passengers()
+            ->where('passenger_id', $user->id)
+            ->whereIn('status', [RidePassenger::STATUS_CONFIRMED, RidePassenger::STATUS_COMPLETED])
+            ->exists();
+    }
+
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(Rating::class);
+    }
+
+    public function getOccupiedSeatsAttribute(): int
+    {
+        return $this->total_seats - $this->available_seats;
+    }
+
+    public function getDepartureAttribute(): Carbon
+    {
+        return Carbon::parse($this->departure_date->toDateString().' '.$this->departure_time);
+    }
+}

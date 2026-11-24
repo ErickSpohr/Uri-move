@@ -1,0 +1,11 @@
+.dart_tool/
+.flutter-sdk/
+build/
+android/
+.idea/
+test/
+*.iml
+brevo-*.png
+render-*.png
+cadastro-email-pronto.png
+uri-move-publicado.png
