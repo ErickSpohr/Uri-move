@@ -79,10 +79,16 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user->isVerified()) {
-            $this->emailVerification->send($user);
+            $codeSent = ! $this->emailVerification->hasRecentCode($user);
+
+            if ($codeSent) {
+                $this->emailVerification->send($user);
+            }
 
             return response()->json([
-                'message' => 'E-mail ainda não verificado. Um novo código foi enviado.',
+                'message' => $codeSent
+                    ? 'E-mail ainda não verificado. Um novo código foi enviado.'
+                    : 'E-mail ainda não verificado. Use o código enviado recentemente.',
                 'requires_email_verification' => true,
                 'user' => new UserResource($user->load('course', 'campus')),
             ], Response::HTTP_FORBIDDEN);

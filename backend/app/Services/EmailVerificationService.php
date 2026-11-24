@@ -47,6 +47,18 @@ class EmailVerificationService
         }
     }
 
+    /**
+     * Indica se um código ainda válido foi emitido nos últimos $seconds segundos.
+     */
+    public function hasRecentCode(User $user, int $seconds = 120): bool
+    {
+        return $user->emailVerifications()
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->where('created_at', '>=', now()->subSeconds($seconds))
+            ->exists();
+    }
+
     public function verify(User $user, string $code): bool
     {
         $record = $user->emailVerifications()

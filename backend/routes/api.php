@@ -24,10 +24,10 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/forgot-password', [PasswordResetController::class, 'forgot'])->middleware('throttle:3,1');
         Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1');
-        Route::post('/register', [AuthController::class, 'register']);
-        Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
-        Route::post('/resend-code', [AuthController::class, 'resendCode']);
-        Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:send-code');
+        Route::post('/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:verify-email');
+        Route::post('/resend-code', [AuthController::class, 'resendCode'])->middleware('throttle:send-code');
+        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     });
 

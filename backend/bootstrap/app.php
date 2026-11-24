@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Render/Vercel encaminham via proxy reverso; sem isso request->ip() é o IP do proxy
+        // e os limites por IP seriam compartilhados entre todos os usuários.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'auth.admin' => EnsureUserIsAdmin::class,
         ]);

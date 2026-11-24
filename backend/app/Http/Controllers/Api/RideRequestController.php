@@ -109,6 +109,12 @@ class RideRequestController extends Controller
     private function accept(Ride $ride, RideRequest $rideRequest): void
     {
         DB::transaction(function () use ($ride, $rideRequest) {
+            // Bloqueia carona e solicitação até o commit: aceitações simultâneas são serializadas
+            // e a verificação de vagas/status usa valores atuais do banco.
+            $ride = Ride::whereKey($ride->id)->lockForUpdate()->firstOrFail();
+            $rideRequest = RideRequest::whereKey($rideRequest->id)->lockForUpdate()->firstOrFail();
+
+            abort_if($rideRequest->status !== RideRequest::STATUS_PENDING, 422, 'Essa solicitação já foi respondida.');
             abort_if($rideRequest->seats_requested > $ride->available_seats, 422, 'Não há vagas suficientes para aceitar esta solicitação.');
 
             $rideRequest->update([
