@@ -1,0 +1,20 @@
+name: Keep API awake
+
+# O Render (plano Free) desliga a API após 15 min sem tráfego e o Supabase (Free)
+# pausa o projeto após dias sem acesso. A rota consultada lê o banco, mantendo os dois ativos.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping API
+        env:
+          URL: ${{ vars.KEEP_ALIVE_URL || 'https://uri-move-api-rjwm.onrender.com/api/v1/campuses' }}
+        run: curl --fail --silent --show-error --max-time 120 --retry 2 --retry-delay 10 -o /dev/null -w '%{http_code} em %{time_total}s\n' "$URL"
