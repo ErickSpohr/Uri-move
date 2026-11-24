@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../env_config.dart';
@@ -8,9 +10,14 @@ import '../env_config.dart';
 class ApiException implements Exception {
   ApiException(this.statusCode, this.message, [this.data]);
 
+  /// `statusCode` usado para falhas sem resposta HTTP (timeout ou rede).
+  static const int noResponse = 0;
+
   final int statusCode;
   final String message;
   final dynamic data;
+
+  bool get isConnectionError => statusCode == noResponse;
 
   @override
   String toString() => message;
@@ -24,6 +31,18 @@ class ApiClient {
   ApiClient({String? baseUrl, http.Client? client})
     : baseUrl = baseUrl ?? EnvConfig.normalizedApiUrl,
       _client = client ?? http.Client();
+
+  /// Limite por requisição. Cobre a retomada do servidor no plano gratuito
+  /// do Render (~1 min após inatividade).
+  static const Duration requestTimeout = Duration(seconds: 75);
+
+  /// Tempo a partir do qual a requisição é sinalizada como lenta.
+  static const Duration slowThreshold = Duration(seconds: 5);
+
+  /// Número de requisições em andamento há mais de [slowThreshold].
+  static final ValueNotifier<int> slowRequests = ValueNotifier<int>(0);
+
+  static const Set<int> _retryableStatus = {502, 503, 504};
 
   final String baseUrl;
   final http.Client _client;
@@ -69,8 +88,11 @@ class ApiClient {
     request.files.add(
       http.MultipartFile.fromBytes('photo', bytes, filename: filename),
     );
-    final streamed = await _client.send(request);
-    return _decode(await http.Response.fromStream(streamed));
+    final response = await _perform(() async {
+      final streamed = await _client.send(request);
+      return http.Response.fromStream(streamed);
+    });
+    return _decode(response);
   }
 
   Future<dynamic> delete(String path) {
@@ -86,33 +108,84 @@ class ApiClient {
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
     final headers = _headers(json: body != null || method == 'POST');
 
-    http.Response response;
-    switch (method) {
-      case 'GET':
-        response = await _client.get(uri, headers: headers);
-      case 'PATCH':
-        response = await _client.patch(
-          uri,
-          headers: headers,
-          body: body == null ? null : jsonEncode(body),
-        );
-      case 'PUT':
-        response = await _client.put(
-          uri,
-          headers: headers,
-          body: body == null ? null : jsonEncode(body),
-        );
-      case 'DELETE':
-        response = await _client.delete(uri, headers: headers);
-      default:
-        response = await _client.post(
-          uri,
-          headers: headers,
-          body: body == null ? null : jsonEncode(body),
-        );
+    Future<http.Response> request() {
+      switch (method) {
+        case 'GET':
+          return _client.get(uri, headers: headers);
+        case 'PATCH':
+          return _client.patch(
+            uri,
+            headers: headers,
+            body: body == null ? null : jsonEncode(body),
+          );
+        case 'PUT':
+          return _client.put(
+            uri,
+            headers: headers,
+            body: body == null ? null : jsonEncode(body),
+          );
+        case 'DELETE':
+          return _client.delete(uri, headers: headers);
+        default:
+          return _client.post(
+            uri,
+            headers: headers,
+            body: body == null ? null : jsonEncode(body),
+          );
+      }
     }
 
+    // Somente GET é repetido: é idempotente e não duplica efeitos no servidor.
+    final response = await _perform(request, retry: method == 'GET');
+
     return _decode(response);
+  }
+
+  /// Executa a requisição com timeout, sinalização de lentidão e conversão de
+  /// falhas de rede em [ApiException]. Com [retry], repete uma vez após falha
+  /// de conexão ou status 502/503/504.
+  Future<http.Response> _perform(
+    Future<http.Response> Function() request, {
+    bool retry = false,
+  }) async {
+    var markedSlow = false;
+    final slowTimer = Timer(slowThreshold, () {
+      markedSlow = true;
+      slowRequests.value++;
+    });
+
+    try {
+      for (var attempt = 1; ; attempt++) {
+        final canRetry = retry && attempt == 1;
+        try {
+          final response = await request().timeout(requestTimeout);
+          if (canRetry && _retryableStatus.contains(response.statusCode)) {
+            await Future<void>.delayed(const Duration(seconds: 2));
+            continue;
+          }
+          return response;
+        } on TimeoutException {
+          throw ApiException(
+            ApiException.noResponse,
+            'O servidor demorou para responder. Verifique sua conexão e tente novamente.',
+          );
+        } on http.ClientException {
+          if (canRetry) {
+            await Future<void>.delayed(const Duration(seconds: 2));
+            continue;
+          }
+          throw ApiException(
+            ApiException.noResponse,
+            'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+          );
+        }
+      }
+    } finally {
+      slowTimer.cancel();
+      if (markedSlow) {
+        slowRequests.value--;
+      }
+    }
   }
 
   dynamic _decode(http.Response response) {

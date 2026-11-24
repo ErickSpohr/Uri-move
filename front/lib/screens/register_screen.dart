@@ -60,6 +60,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Não foi possível carregar os dados: ${e.message}'),
+            duration: const Duration(seconds: 10),
+            action: SnackBarAction(
+              label: 'Tentar novamente',
+              onPressed: _retryLoadRefs,
+            ),
           ),
         );
       });
@@ -71,6 +76,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _loadingRefs = false;
       });
     }
+  }
+
+  void _retryLoadRefs() {
+    setState(() => _loadingRefs = true);
+    _loadRefs();
   }
 
   @override
