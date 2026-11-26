@@ -94,13 +94,17 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            // null evita um "set search_path" (ida e volta ao banco) a cada conexão;
+            // o search_path padrão do Postgres já inclui "public".
+            'search_path' => env('DB_SET_SEARCH_PATH', true) ? 'public' : null,
             'sslmode' => env('DB_SSLMODE', 'prefer'),
-            // Reaproveita a conexão por processo do Apache: evita refazer TCP/TLS/autenticação
-            // a cada requisição quando o banco está em outra região (Render Oregon → Supabase SP).
-            'options' => extension_loaded('pdo_pgsql') && env('DB_PERSISTENT', false)
-                ? [PDO::ATTR_PERSISTENT => true]
-                : [],
+            // Banco em outra região (Render Oregon → Supabase SP, ~180 ms por ida e volta):
+            // DB_PERSISTENT reaproveita a conexão por processo do Apache;
+            // DB_EMULATE_PREPARES envia cada consulta em uma ida e volta em vez de duas.
+            'options' => extension_loaded('pdo_pgsql') ? array_filter([
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
+                PDO::ATTR_EMULATE_PREPARES => (bool) env('DB_EMULATE_PREPARES', false),
+            ]) : [],
         ],
 
         'sqlsrv' => [
