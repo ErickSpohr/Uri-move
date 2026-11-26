@@ -66,6 +66,7 @@ class User {
     this.course,
     this.campus,
     this.pixKey,
+    this.createdAt,
   });
 
   final int id;
@@ -85,6 +86,9 @@ class User {
 
   /// Chave Pix (visível apenas para o próprio usuário).
   final String? pixKey;
+
+  /// Data de cadastro (ISO 8601).
+  final String? createdAt;
 
   bool get isDriver => role == 'driver';
   bool get isAdmin => role == 'admin';
@@ -110,6 +114,7 @@ class User {
         ? Campus.fromJson(Map<String, dynamic>.from(json['campus'] as Map))
         : null,
     pixKey: json['pix_key'] as String?,
+    createdAt: json['created_at'] as String?,
   );
 }
 

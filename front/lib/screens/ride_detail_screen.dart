@@ -18,6 +18,7 @@ import '../widgets/ride_route_map.dart';
 import '../widgets/user_safety.dart';
 import 'pickup_picker_screen.dart';
 import 'rate_ride_screen.dart';
+import 'user_profile_screen.dart';
 import 'ride_chat_screen.dart';
 import 'private_ride_chat_screen.dart';
 import 'ride_tracking_screen.dart';
@@ -736,7 +737,14 @@ class _DriverCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final driver = ride.driver;
     return Card(
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => UserProfileScreen(user: driver, rideId: ride.id),
+          ),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
@@ -756,7 +764,7 @@ class _DriverCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    driver.course?.name ?? 'Motorista',
+                    'Motorista · ver perfil',
                     style: TextStyle(
                       fontSize: 13,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -799,8 +807,13 @@ class _DriverCard extends StatelessWidget {
                 ),
               ),
             if (showSafetyMenu) UserSafetyMenu(user: driver, rideId: ride.id),
+            Icon(
+              Icons.chevron_right,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -838,12 +851,33 @@ class _RequestTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Column(
+                  child: InkWell(
+                    // Motorista confere a reputação de quem pediu antes de aceitar.
+                    onTap: passenger == null
+                        ? null
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => UserProfileScreen(
+                                user: passenger,
+                                rideId: ride.id,
+                              ),
+                            ),
+                          ),
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         passenger?.name ?? 'Passageiro',
                         style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        passenger?.ratingAvg == null
+                            ? 'Sem avaliações · ver perfil'
+                            : '★ ${passenger!.ratingAvg!.toStringAsFixed(1)} · ver perfil',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       Text(
                         '${request.seatsRequested} vaga${request.seatsRequested > 1 ? 's' : ''}',
@@ -853,6 +887,7 @@ class _RequestTile extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
                 _RespondButton(
