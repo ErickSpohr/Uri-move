@@ -2,7 +2,7 @@ FROM php:8.5-apache
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip libpq-dev libicu-dev libzip-dev libonig-dev \
-    && docker-php-ext-install pdo_pgsql intl zip mbstring bcmath \
+    && docker-php-ext-install pdo_pgsql intl zip mbstring bcmath opcache \
     && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,6 +19,8 @@ RUN composer dump-autoload --no-dev --optimize --no-interaction \
 
 COPY deploy/apache.conf /etc/apache2/sites-available/000-default.conf
 COPY deploy/ports.conf /etc/apache2/ports.conf
+COPY deploy/mpm_prefork.conf /etc/apache2/mods-available/mpm_prefork.conf
+COPY deploy/opcache.ini /usr/local/etc/php/conf.d/zz-opcache.ini
 COPY deploy/start.sh /usr/local/bin/uri-move-start
 RUN chmod +x /usr/local/bin/uri-move-start
 

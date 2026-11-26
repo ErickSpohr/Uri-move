@@ -96,6 +96,11 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Reaproveita a conexão por processo do Apache: evita refazer TCP/TLS/autenticação
+            // a cada requisição quando o banco está em outra região (Render Oregon → Supabase SP).
+            'options' => extension_loaded('pdo_pgsql') && env('DB_PERSISTENT', false)
+                ? [PDO::ATTR_PERSISTENT => true]
+                : [],
         ],
 
         'sqlsrv' => [
