@@ -266,6 +266,20 @@ class ApiRepository {
     await client.post('/push/subscriptions', body: subscription);
   }
 
+  /// Perfil público (sem contato, RA ou dados pessoais).
+  Future<User> userProfile(int userId) async {
+    final json = await client.get('/users/$userId');
+    return User.fromJson(Map<String, dynamic>.from((json as Map)['user'] as Map));
+  }
+
+  /// Avaliações recebidas, mais recentes primeiro.
+  Future<List<Map<String, dynamic>>> userRatings(int userId) async {
+    final json = await client.get('/users/$userId/ratings');
+    return [
+      for (final item in dataList(json)) Map<String, dynamic>.from(item as Map),
+    ];
+  }
+
   Future<void> registerDevice(String token) async {
     await client.post('/push/devices', body: {'token': token, 'platform': 'android'});
   }
