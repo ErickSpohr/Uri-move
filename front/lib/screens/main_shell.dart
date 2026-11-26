@@ -18,7 +18,7 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   static const Duration _unreadPollInterval = Duration(seconds: 30);
 
   int _index = 0;
@@ -30,10 +30,24 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     _refreshUnread();
     _unreadTimer = Timer.periodic(_unreadPollInterval, (_) => _refreshUnread());
+    WidgetsBinding.instance.addObserver(this);
+    // Retoma o envio da posição se o motorista tiver carona em andamento.
+    context.read<AuthController>().locationSharer.sync();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final auth = context.read<AuthController>();
+      auth.locationSharer.sync();
+      auth.notifyDataChanged();
+      _refreshUnread();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _unreadTimer?.cancel();
     super.dispose();
   }
@@ -51,6 +65,8 @@ class _MainShellState extends State<MainShell> {
   void _goTo(int index) {
     setState(() => _index = index);
     _refreshUnread();
+    // As abas ficam montadas no IndexedStack; o sinal faz cada uma recarregar.
+    context.read<AuthController>().notifyDataChanged();
   }
 
   @override
@@ -76,7 +92,12 @@ class _MainShellState extends State<MainShell> {
       },
       child: Scaffold(
         body: IndexedStack(index: _index, children: screens),
-        bottomNavigationBar: NavigationBar(
+        // Faixa acima da barra de navegação: não interfere na área da AppBar.
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _SharingBanner(),
+            NavigationBar(
           selectedIndex: _index,
           onDestinationSelected: _goTo,
           destinations: [
@@ -115,7 +136,61 @@ class _MainShellState extends State<MainShell> {
             ),
           ],
         ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Faixa exibida ao motorista enquanto a posição é enviada aos passageiros.
+class _SharingBanner extends StatelessWidget {
+  const _SharingBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final sharer = context.read<AuthController>().locationSharer;
+    return ListenableBuilder(
+      listenable: sharer,
+      builder: (context, _) {
+        if (!sharer.isSharing) return const SizedBox.shrink();
+        final scheme = Theme.of(context).colorScheme;
+        final error = sharer.error;
+        return Material(
+          color: error == null ? scheme.primaryContainer : scheme.errorContainer,
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    error == null ? Icons.location_on : Icons.location_off,
+                    size: 18,
+                    color: error == null ? scheme.onPrimaryContainer : scheme.onErrorContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      error ?? 'Carona em andamento: sua localização está sendo compartilhada.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: error == null ? scheme.onPrimaryContainer : scheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                  if (error != null && sharer.rideId != null)
+                    TextButton(
+                      onPressed: () => sharer.start(sharer.rideId!),
+                      child: const Text('Tentar de novo'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

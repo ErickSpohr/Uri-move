@@ -70,16 +70,28 @@ class _RideListBaseState extends State<_RideListBase> {
   List<Ride> _rides = [];
   bool _loading = true;
   String? _error;
+  late final AuthController _auth;
 
   @override
   void initState() {
     super.initState();
+    _auth = context.read<AuthController>();
+    _auth.dataVersion.addListener(_reloadSilently);
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _auth.dataVersion.removeListener(_reloadSilently);
+    super.dispose();
+  }
+
+  void _reloadSilently() => _load(silent: true);
+
+  /// [silent] mantém a lista atual na tela enquanto recarrega.
+  Future<void> _load({bool silent = false}) async {
     setState(() {
-      _loading = true;
+      _loading = !silent || _rides.isEmpty;
       _error = null;
     });
     try {
@@ -120,9 +132,18 @@ class _RideListBaseState extends State<_RideListBase> {
       return Center(child: Text(_error!));
     }
     if (_rides.isEmpty) {
-      return const EmptyState(
-        icon: Icons.directions_car_outlined,
-        message: 'Nenhuma carona encontrada.',
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 80),
+            EmptyState(
+              icon: Icons.directions_car_outlined,
+              message: 'Nenhuma carona encontrada.',
+            ),
+          ],
+        ),
       );
     }
     return RefreshIndicator(
@@ -138,11 +159,13 @@ class _RideListBaseState extends State<_RideListBase> {
           return RideCard(
             ride: ride,
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => RideDetailScreen(rideId: ride.id),
-                ),
-              );
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (_) => RideDetailScreen(rideId: ride.id),
+                    ),
+                  )
+                  .then((_) => _reloadSilently());
             },
           );
         },

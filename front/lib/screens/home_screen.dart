@@ -37,15 +37,22 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _error;
 
+  late final AuthController _auth;
+
   @override
   void initState() {
     super.initState();
+    _auth = context.read<AuthController>();
+    _auth.dataVersion.addListener(_reloadSilently);
     _load();
   }
 
-  Future<void> _load() async {
+  void _reloadSilently() => _load(silent: true);
+
+  /// [silent] mantém a lista atual na tela enquanto recarrega.
+  Future<void> _load({bool silent = false}) async {
     setState(() {
-      _loading = true;
+      _loading = !silent || _rides.isEmpty;
       _error = null;
     });
     try {
@@ -151,6 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _auth.dataVersion.removeListener(_reloadSilently);
     _originController.dispose();
     _destinationController.dispose();
     super.dispose();

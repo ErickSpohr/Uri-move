@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api.dart';
 import '../core/formats.dart';
@@ -8,6 +13,7 @@ import '../core/theme.dart';
 import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/map_tiles.dart';
 import '../widgets/user_safety.dart';
 import 'pickup_picker_screen.dart';
 import 'rate_ride_screen.dart';
@@ -35,15 +41,29 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
   bool get _isDriver =>
       _ride?.driver.id == context.read<AuthController>().user?.id;
 
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // Atualiza status, vagas e solicitações sem o usuário precisar puxar a tela
+    // (ex.: passageiro vê o cancelamento; motorista vê novos pedidos).
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!_busy) _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() {
-      _loading = true;
+      // Recargas com a carona já na tela não mostram o indicador de carregamento.
+      _loading = _ride == null;
       _error = null;
     });
     try {
@@ -106,6 +126,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
       if (!mounted) {
         return;
       }
+      // Iniciar/concluir/cancelar liga ou desliga o envio automático da posição,
+      // e as abas (Minhas caronas, Explorar) recarregam.
+      final auth = context.read<AuthController>();
+      unawaited(auth.locationSharer.sync());
+      auth.notifyDataChanged();
       if (success != null) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(success)));
@@ -471,6 +496,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ..._requests.map(
                 (r) => _RequestTile(
                   request: r,
+                  ride: ride,
                   onChat: r.passenger == null
                       ? null
                       : () => Navigator.of(context).push(
@@ -780,11 +806,13 @@ class _DriverCard extends StatelessWidget {
 class _RequestTile extends StatelessWidget {
   const _RequestTile({
     required this.request,
+    required this.ride,
     required this.onRespond,
     this.onChat,
   });
 
   final RideRequest request;
+  final Ride ride;
   final void Function(String action) onRespond;
   final VoidCallback? onChat;
 
@@ -848,25 +876,8 @@ class _RequestTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (request.hasPickup) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.place_outlined,
-                    size: 18,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Embarque: ${request.pickupLabel ?? 'ponto marcado no mapa'}',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            const SizedBox(height: 8),
+            _PickupPreview(request: request, ride: ride),
             if (onChat != null)
               TextButton.icon(
                 onPressed: onChat,
@@ -1001,8 +1012,8 @@ class _RequestDialogState extends State<_RequestDialog> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Opcional. O motorista vê o ponto no mapa e você é avisado '
-            'quando ele estiver chegando.',
+            'Obrigatório. O motorista vê de onde você sai antes de aceitar, '
+            'e você é avisado quando ele estiver chegando.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -1018,8 +1029,10 @@ class _RequestDialogState extends State<_RequestDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: () =>
-              Navigator.of(context).pop(_RequestChoice(_seats, _pickup)),
+          // O ponto de embarque é obrigatório: o motorista decide com base nele.
+          onPressed: _pickup == null
+              ? null
+              : () => Navigator.of(context).pop(_RequestChoice(_seats, _pickup)),
           child: const Text('Enviar solicitação'),
         ),
       ],
@@ -1114,6 +1127,123 @@ class _PixCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Ponto de embarque do pedido, mostrado ao motorista antes de aceitar:
+/// mapa com o ponto (e a origem da carona, se tiver coordenadas) e a distância.
+class _PickupPreview extends StatelessWidget {
+  const _PickupPreview({required this.request, required this.ride});
+
+  final RideRequest request;
+  final Ride ride;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (!request.hasPickup) {
+      return Text(
+        'Sem ponto de embarque marcado. Combine pelo chat.',
+        style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+      );
+    }
+    final pickup = LatLng(request.pickupLat!, request.pickupLng!);
+    final origin = ride.originLat != null && ride.originLng != null
+        ? LatLng(ride.originLat!, ride.originLng!)
+        : null;
+    final km = origin == null
+        ? null
+        : const Distance().as(LengthUnit.Meter, origin, pickup) / 1000;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(
+                text: 'Embarque: ',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              TextSpan(text: request.pickupLabel ?? 'ponto marcado no mapa'),
+              if (km != null)
+                TextSpan(
+                  text:
+                      ' · ${km.toStringAsFixed(1).replaceAll('.', ',')} km da sua partida',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+            ],
+          ),
+          style: const TextStyle(fontSize: 13),
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            height: 150,
+            child: Semantics(
+              label: 'Mapa do ponto de embarque',
+              child: FlutterMap(
+                options: MapOptions(
+                  initialCenter: pickup,
+                  initialZoom: 15,
+                  initialCameraFit: origin == null
+                      ? null
+                      : CameraFit.coordinates(
+                          coordinates: [origin, pickup],
+                          padding: const EdgeInsets.all(28),
+                          maxZoom: 16,
+                        ),
+                  // Prévia estática: rolar a página não deve mover o mapa.
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.none,
+                  ),
+                ),
+                children: [
+                  AppMapTiles.layer(context),
+                  MarkerLayer(
+                    markers: [
+                      if (origin != null)
+                        Marker(
+                          point: origin,
+                          width: 28,
+                          height: 28,
+                          child: Icon(Icons.trip_origin, color: scheme.primary),
+                        ),
+                      Marker(
+                        point: pickup,
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.topCenter,
+                        child: Icon(
+                          Icons.person_pin_circle,
+                          color: Colors.green.shade700,
+                          size: 34,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => launchUrl(
+              Uri.parse(
+                'https://www.google.com/maps/search/?api=1&query='
+                '${pickup.latitude},${pickup.longitude}',
+              ),
+              mode: LaunchMode.externalApplication,
+            ),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Abrir no Google Maps'),
+          ),
+        ),
+      ],
     );
   }
 }

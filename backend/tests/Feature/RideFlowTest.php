@@ -118,6 +118,8 @@ class RideFlowTest extends TestCase
         Sanctum::actingAs($passenger);
         $requestResponse = $this->postJson("/api/v1/rides/{$ride->id}/requests", [
             'seats_requested' => 1,
+            'pickup_lat' => -28.15,
+            'pickup_lng' => -54.74,
         ]);
         $requestResponse->assertCreated();
         $requestId = $requestResponse->json('request.id');

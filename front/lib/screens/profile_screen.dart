@@ -22,15 +22,25 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   List<Vehicle> _vehicles = [];
   bool _loadingVehicles = false;
+  late final AuthController _auth;
 
   @override
   void initState() {
     super.initState();
+    _auth = context.read<AuthController>();
+    _auth.dataVersion.addListener(_loadVehicles);
     _loadVehicles();
   }
 
+  @override
+  void dispose() {
+    _auth.dataVersion.removeListener(_loadVehicles);
+    super.dispose();
+  }
+
   Future<void> _loadVehicles() async {
-    setState(() => _loadingVehicles = true);
+    // Recarga silenciosa quando a lista já está na tela.
+    setState(() => _loadingVehicles = _vehicles.isEmpty);
     try {
       final vehicles = await context.read<AuthController>().api.vehicles();
       if (!mounted) {
@@ -57,6 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     setState(() => _vehicles.add(created));
+    context.read<AuthController>().notifyDataChanged();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Veículo cadastrado com sucesso!')),
     );
@@ -70,6 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (updated == null || !mounted) {
       return;
     }
+    context.read<AuthController>().notifyDataChanged();
     setState(() {
       final index = _vehicles.indexWhere((item) => item.id == updated.id);
       if (index != -1) {

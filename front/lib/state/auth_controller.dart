@@ -7,6 +7,7 @@ import '../core/api.dart';
 import '../core/push_notifications.dart';
 import '../models/models.dart';
 import '../services/api_repository.dart';
+import '../services/ride_location_sharer.dart';
 
 /// Estado global de autenticação e dados do usuário logado.
 class AuthController extends ChangeNotifier {
@@ -16,6 +17,15 @@ class AuthController extends ChangeNotifier {
   final ApiRepository _api;
 
   final _tokenStorage = TokenStorage();
+
+  /// Envio automático da posição do motorista durante caronas em andamento.
+  late final RideLocationSharer locationSharer = RideLocationSharer(_api);
+
+  /// Incrementado quando dados compartilhados entre abas mudam (veículos,
+  /// caronas, solicitações) ou ao trocar de aba; as telas escutam e recarregam.
+  final ValueNotifier<int> dataVersion = ValueNotifier<int>(0);
+
+  void notifyDataChanged() => dataVersion.value++;
 
   bool _ready = false;
   bool _busy = false;
@@ -174,6 +184,8 @@ class AuthController extends ChangeNotifier {
     } catch (_) {
       // Sem push ou falha de rede: segue com o logout.
     }
+    // Antes de revogar o token, para o servidor ainda aceitar o encerramento.
+    await locationSharer.stop();
     try {
       await _api.logout();
     } catch (_) {

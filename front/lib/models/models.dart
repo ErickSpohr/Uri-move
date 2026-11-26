@@ -172,6 +172,8 @@ class Ride {
     this.seriesId,
     this.womenOnly = false,
     this.driverPixKey,
+    this.originLat,
+    this.originLng,
   });
 
   final int id;
@@ -200,6 +202,10 @@ class Ride {
 
   /// Chave Pix do motorista (enviada só ao motorista e a passageiros aceitos).
   final String? driverPixKey;
+
+  /// Coordenadas da origem, quando escolhida pelo autocompletar de endereço.
+  final double? originLat;
+  final double? originLng;
 
   bool get isActive => status == 'active';
   bool get isCompleted => status == 'completed';
@@ -233,6 +239,8 @@ class Ride {
     seriesId: json['series_id'] as String?,
     womenOnly: json['women_only'] as bool? ?? false,
     driverPixKey: json['driver_pix_key'] as String?,
+    originLat: (json['origin_lat'] as num?)?.toDouble(),
+    originLng: (json['origin_lng'] as num?)?.toDouble(),
   );
 }
 
