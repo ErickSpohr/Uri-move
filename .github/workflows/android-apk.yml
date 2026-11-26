@@ -1,6 +1,7 @@
 name: Android APK
 
 # Gera o APK apontando para a API de produção e publica na release "apk".
+# Config do Firebase: variáveis do repositório (Settings → Variables → Actions).
 on:
   push:
     branches: [main]
