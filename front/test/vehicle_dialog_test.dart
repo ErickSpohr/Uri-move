@@ -74,6 +74,9 @@ void main() {
       find.widgetWithText(TextField, 'Modelo (ex.: Argo)'),
       'Gol Special',
     );
+    // O campo de consumo empurrou o seletor de lugares para baixo no diálogo.
+    await tester.ensureVisible(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.add));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
