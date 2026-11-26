@@ -169,17 +169,11 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(height * 0.08),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(height * 0.12),
-      ),
-      child: Image.asset(
-        'assets/images/logo.png',
-        height: height,
-        semanticLabel: 'URI Move',
-      ),
+    // PNG com fundo transparente: dispensa moldura.
+    return Image.asset(
+      'assets/images/logo.png',
+      height: height,
+      semanticLabel: 'URI Move',
     );
   }
 }
