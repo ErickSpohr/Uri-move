@@ -181,24 +181,38 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(context),
-          // Com o teclado aberto o mapa é ocultado para manter a lista visível
-          // em telas pequenas.
-          if (MediaQuery.viewInsetsOf(context).bottom == 0)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: LocationMap(),
-            ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _load,
-              color: AppTheme.primary,
-              child: _buildList(),
-            ),
-          ),
-        ],
+      body: Builder(
+        builder: (context) {
+          // Teclado aberto: a busca ocupa a tela toda (com rolagem) para as
+          // sugestões caberem; mapa e lista voltam ao fechar o teclado.
+          // A árvore mantém o mesmo Flexible/SingleChildScrollView nos dois
+          // estados para o campo não perder o foco.
+          final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+          return Column(
+            children: [
+              Flexible(
+                flex: typing ? 1 : 0,
+                fit: typing ? FlexFit.tight : FlexFit.loose,
+                child: SingleChildScrollView(
+                  child: _buildSearchBar(context),
+                ),
+              ),
+              if (!typing) ...[
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: LocationMap(),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    color: AppTheme.primary,
+                    child: _buildList(),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -208,25 +222,19 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: AddressAutocompleteField(
-                  controller: _originController,
-                  label: 'Origem',
-                  icon: Icons.trip_origin,
-                  currentLocation: CurrentLocationMode.city,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: AddressAutocompleteField(
-                  controller: _destinationController,
-                  label: 'Destino',
-                  icon: Icons.location_on_outlined,
-                ),
-              ),
-            ],
+          // Um campo por linha: lado a lado o texto e a lista de sugestões
+          // ficavam espremidos em meia largura no celular.
+          AddressAutocompleteField(
+            controller: _originController,
+            label: 'Origem',
+            icon: Icons.trip_origin,
+            currentLocation: CurrentLocationMode.city,
+          ),
+          const SizedBox(height: 10),
+          AddressAutocompleteField(
+            controller: _destinationController,
+            label: 'Destino',
+            icon: Icons.location_on_outlined,
           ),
           const SizedBox(height: 10),
           Row(

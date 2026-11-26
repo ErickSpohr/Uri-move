@@ -337,7 +337,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             labelText: widget.label,
-            hintText: 'Rua, bairro, cidade ou "URI"',
+            hintText: 'Rua, cidade ou "URI"',
             prefixIcon: Icon(widget.icon),
             suffixIcon: _loading || _locating
                 ? const Padding(
