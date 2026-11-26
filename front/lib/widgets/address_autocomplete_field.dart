@@ -62,6 +62,14 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   bool _searchFailed = false;
   int _requestId = 0;
 
+  /// Campo em uso: mostra os atalhos (localização atual / marcar no mapa).
+  bool _active = false;
+
+  /// Último texto preenchido pelo app e ponto correspondente. Se o texto atual
+  /// for esse, ele não foi digitado pelo usuário e não deve ser preservado.
+  String? _filledLabel;
+  LatLng? _lastPoint;
+
   /// Suprime a busca disparada pelo listener quando o texto é preenchido pelo app.
   bool _settingText = false;
 
@@ -125,12 +133,16 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
 
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
+      setState(() => _active = true);
       if (_isEmpty) _showHistory();
     } else {
-      // Aguarda o toque na sugestão antes de ocultar a lista.
+      // Aguarda o toque na sugestão/atalho antes de ocultar.
       Future<void>.delayed(const Duration(milliseconds: 200), () {
         if (mounted && !_focusNode.hasFocus) {
-          setState(() => _showSuggestions = false);
+          setState(() {
+            _showSuggestions = false;
+            _active = false;
+          });
         }
       });
     }
@@ -209,6 +221,10 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   }
 
   void _fill(PlaceSuggestion place) {
+    _filledLabel = place.label;
+    _lastPoint = place.latitude == null
+        ? null
+        : LatLng(place.latitude!, place.longitude!);
     _settingText = true;
     widget.controller.value = TextEditingValue(
       text: place.label,
@@ -217,7 +233,10 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     _settingText = false;
     widget.onSelected?.call(place.latitude, place.longitude);
     _focusNode.unfocus();
-    setState(() => _showSuggestions = false);
+    setState(() {
+      _showSuggestions = false;
+      _active = false;
+    });
     if (place.latitude != null) _remember(place);
   }
 
@@ -263,13 +282,18 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   /// Endereço não encontrado: o usuário marca o ponto no mapa. O texto já
   /// digitado é mantido (ex.: rua e número), ganhando as coordenadas marcadas.
   Future<void> _pickOnMap() async {
-    final typed = widget.controller.text.trim();
+    final text = widget.controller.text.trim();
+    // Só preserva texto digitado pelo usuário; um rótulo que o próprio app
+    // preencheu (marcação anterior) é substituído pelo endereço do novo ponto.
+    final typed = text == _filledLabel ? '' : text;
     _focusNode.unfocus();
     final picked = await Navigator.of(context).push<PickupPoint>(
       MaterialPageRoute(
         builder: (_) => PickupPickerScreen(
           title: widget.label,
           askLabel: false,
+          // Reabre no ponto marcado antes, para ajustar em vez de recomeçar.
+          initial: _lastPoint == null ? null : PickupPoint(_lastPoint!, null),
         ),
       ),
     );
@@ -323,8 +347,6 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final query = widget.controller.text.trim();
-    final showMapOption = query.isNotEmpty && !_loading;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -346,20 +368,31 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
-                : _offersCurrentLocation
-                ? IconButton(
-                    tooltip: 'Usar minha localização atual',
-                    icon: const Icon(Icons.my_location),
-                    onPressed: _useCurrentLocation,
-                  )
-                : IconButton(
-                    tooltip: 'Marcar no mapa',
-                    icon: const Icon(Icons.map_outlined),
-                    onPressed: _pickOnMap,
-                  ),
+                : null,
           ),
         ),
-        if (_showSuggestions && (_suggestions.isNotEmpty || showMapOption))
+        if (_active)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (_offersCurrentLocation)
+                  ActionChip(
+                    avatar: Icon(Icons.my_location, size: 18, color: scheme.primary),
+                    label: const Text('Minha localização'),
+                    onPressed: _locating ? null : _useCurrentLocation,
+                  ),
+                ActionChip(
+                  avatar: Icon(Icons.map_outlined, size: 18, color: scheme.primary),
+                  label: const Text('Marcar no mapa'),
+                  onPressed: _pickOnMap,
+                ),
+              ],
+            ),
+          ),
+        if (_showSuggestions && (_suggestions.isNotEmpty || _searchFailed))
           Card(
             margin: const EdgeInsets.only(top: 4),
             clipBehavior: Clip.antiAlias,
@@ -392,14 +425,6 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                       dense: true,
                       leading: Icon(Icons.wifi_off, color: scheme.error),
                       title: const Text('Busca indisponível no momento.'),
-                    ),
-                  if (showMapOption)
-                    ListTile(
-                      dense: true,
-                      leading: Icon(Icons.map_outlined, color: scheme.primary),
-                      title: const Text('Não achou? Marcar no mapa'),
-                      subtitle: const Text('Mantém o que você digitou'),
-                      onTap: _pickOnMap,
                     ),
                 ],
               ),
