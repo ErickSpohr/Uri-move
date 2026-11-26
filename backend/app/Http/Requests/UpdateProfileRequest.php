@@ -18,6 +18,7 @@ class UpdateProfileRequest extends FormRequest
             'name' => ['nullable', 'string', 'max:191'],
             'phone' => ['nullable', 'string', 'max:30'],
             'gender' => ['nullable', 'string', 'in:woman,man,non_binary,prefer_not_to_say,other'],
+            'pix_key' => ['nullable', 'string', 'max:140'],
             'ra' => ['nullable', 'string', 'max:30', Rule::unique('users', 'ra')->ignore($this->user()->id)],
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],

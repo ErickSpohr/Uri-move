@@ -38,6 +38,8 @@ class RideCard extends StatelessWidget {
                       children: [
                         Text(
                           ride.origin,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
@@ -47,17 +49,21 @@ class RideCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.arrow_downward,
                                 size: 16,
-                                color: AppTheme.primary,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                ride.destination,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                              Expanded(
+                                child: Text(
+                                  ride.destination,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ),
                             ],
@@ -66,35 +72,40 @@ class RideCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (ride.price != null)
-                    Text(
-                      formatPrice(ride.price),
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.primary,
-                      ),
+                  // Preço nulo = gratuita (formatPrice exibe "Grátis").
+                  Text(
+                    formatPrice(ride.price),
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
+              // Wrap evita estouro horizontal em telas estreitas.
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
                   _InfoChip(
                     icon: Icons.calendar_today_outlined,
                     label: formatDate(ride.departureDate),
                   ),
-                  const SizedBox(width: 8),
                   _InfoChip(
                     icon: Icons.schedule,
                     label: formatTime(ride.departureTime),
                   ),
-                  const SizedBox(width: 8),
                   _InfoChip(
                     icon: Icons.airline_seat_recline_normal,
                     label:
                         '${ride.availableSeats} vaga${ride.availableSeats == 1 ? '' : 's'}',
                   ),
+                  if (ride.womenOnly)
+                    const _InfoChip(icon: Icons.female, label: 'Só mulheres'),
+                  if (ride.isRecurring)
+                    const _InfoChip(icon: Icons.repeat, label: 'Semanal'),
                 ],
               ),
               const SizedBox(height: 10),
@@ -206,7 +217,7 @@ class _StatusBadge extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11.5,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),

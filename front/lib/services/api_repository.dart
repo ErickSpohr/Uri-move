@@ -82,17 +82,23 @@ class ApiRepository {
     return dataMap(json);
   }
 
+  /// [pixKey] vazio remove a chave cadastrada.
   Future<Map<String, dynamic>> updateProfile({
     required String name,
     PickedProfilePhoto? photo,
+    String? pixKey,
   }) async {
     final json = photo == null
-        ? await client.put('/me', body: {'name': name})
+        ? await client.put(
+            '/me',
+            body: {'name': name, if (pixKey != null) 'pix_key': pixKey},
+          )
         : await client.uploadPhoto(
             '/me',
             name: name,
             bytes: photo.bytes,
             filename: photo.filename,
+            fields: {if (pixKey != null) 'pix_key': pixKey},
           );
     return Map<String, dynamic>.from((json as Map)['user'] as Map);
   }
@@ -121,12 +127,20 @@ class ApiRepository {
     String? origin,
     String? destination,
     String? date,
+    String? fromTime,
+    String? toTime,
+    double? priceMax,
+    bool womenOnly = false,
   }) async {
     final query = <String, String>{
       if (origin != null && origin.isNotEmpty) 'origin': origin,
       if (destination != null && destination.isNotEmpty)
         'destination': destination,
       if (date != null && date.isNotEmpty) 'date': date,
+      if (fromTime != null) 'from_time': fromTime,
+      if (toTime != null) 'to_time': toTime,
+      if (priceMax != null) 'price_max': priceMax.toStringAsFixed(2),
+      if (womenOnly) 'women_only': '1',
     };
     final json = await client.get('/rides', query: query);
     return dataList(json)
@@ -164,7 +178,9 @@ class ApiRepository {
     await client.delete('/rides/$rideId/location');
   }
 
-  Future<Ride> createRide({
+  /// Publica a carona; com [repeatDays] (1 = segunda … 7 = domingo) e
+  /// [repeatUntil] cria uma série semanal. Retorna a primeira carona e o total criado.
+  Future<({Ride ride, int created})> createRide({
     String? vehicleId,
     required String origin,
     double? originLat,
@@ -177,8 +193,14 @@ class ApiRepository {
     required int totalSeats,
     double? price,
     String? notes,
+    bool womenOnly = false,
+    List<int> repeatDays = const [],
+    String? repeatUntil,
   }) async {
     final body = <String, dynamic>{
+      'women_only': womenOnly,
+      if (repeatDays.isNotEmpty) 'repeat_days': repeatDays,
+      if (repeatDays.isNotEmpty) 'repeat_until': repeatUntil,
       if (vehicleId != null) 'vehicle_id': int.tryParse(vehicleId),
       'origin': origin,
       'destination': destination,
@@ -200,8 +222,11 @@ class ApiRepository {
     if (destinationLng != null) {
       body['destination_lng'] = destinationLng;
     }
-    final json = await client.post('/rides', body: body);
-    return Ride.fromJson(dataMap(json)['ride'] as Map<String, dynamic>);
+    final data = dataMap(await client.post('/rides', body: body));
+    return (
+      ride: Ride.fromJson(data['ride'] as Map<String, dynamic>),
+      created: data['rides_created'] as int? ?? 1,
+    );
   }
 
   Future<Ride> startRide(int id) async {
@@ -214,9 +239,35 @@ class ApiRepository {
     return Ride.fromJson(dataMap(json)['ride'] as Map<String, dynamic>);
   }
 
-  Future<Ride> cancelRide(int id) async {
-    final json = await client.post('/rides/$id/cancel');
-    return Ride.fromJson(dataMap(json)['ride'] as Map<String, dynamic>);
+  /// Com [wholeSeries], cancela também as próximas caronas da mesma série.
+  Future<({Ride ride, int cancelled})> cancelRide(
+    int id, {
+    bool wholeSeries = false,
+  }) async {
+    final data = dataMap(
+      await client.post(
+        '/rides/$id/cancel',
+        body: wholeSeries ? {'scope': 'series'} : null,
+      ),
+    );
+    return (
+      ride: Ride.fromJson(data['ride'] as Map<String, dynamic>),
+      cancelled: data['cancelled_count'] as int? ?? 1,
+    );
+  }
+
+  // ------------------------------------------------------------- Web Push
+  Future<String> pushPublicKey() async {
+    final json = await client.get('/push/public-key');
+    return (json as Map)['public_key'] as String;
+  }
+
+  Future<void> savePushSubscription(Map<String, dynamic> subscription) async {
+    await client.post('/push/subscriptions', body: subscription);
+  }
+
+  Future<void> deletePushSubscription(String endpoint) async {
+    await client.delete('/push/subscriptions', query: {'endpoint': endpoint});
   }
 
   // ------------------------------------------------------------- Solicitações

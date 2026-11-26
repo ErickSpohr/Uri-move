@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'phone', 'gender', 'photo_path', 'ra', 'course_id', 'campus_id', 'role', 'rating_avg', 'rating_count'])]
+#[Fillable(['name', 'email', 'password', 'phone', 'gender', 'photo_path', 'ra', 'course_id', 'campus_id', 'role', 'rating_avg', 'rating_count', 'pix_key'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -26,6 +26,8 @@ class User extends Authenticatable
     public const ROLE_STAFF = 'staff';
 
     public const ROLE_ADMIN = 'admin';
+
+    public const GENDER_WOMAN = 'woman';
 
     protected function casts(): array
     {
@@ -150,6 +152,11 @@ class User extends Authenticatable
             ->where('blocker_id', $id)
             ->where('blocked_id', $this->id)
             ->exists();
+    }
+
+    public function isWoman(): bool
+    {
+        return $this->gender === self::GENDER_WOMAN;
     }
 
     public function isAdmin(): bool

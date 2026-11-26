@@ -341,6 +341,7 @@ class _EditProfileDialog extends StatefulWidget {
 
 class _EditProfileDialogState extends State<_EditProfileDialog> {
   late final TextEditingController _nameController;
+  late final TextEditingController _pixController;
   PickedProfilePhoto? _photo;
   String? _error;
   bool _saving = false;
@@ -349,11 +350,13 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.user.name);
+    _pixController = TextEditingController(text: widget.user.pixKey ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _pixController.dispose();
     super.dispose();
   }
 
@@ -389,7 +392,11 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
       _error = null;
     });
     final auth = context.read<AuthController>();
-    final saved = await auth.updateProfile(name: name, photo: _photo);
+    final saved = await auth.updateProfile(
+      name: name,
+      photo: _photo,
+      pixKey: _pixController.text.trim(),
+    );
     if (!mounted) {
       return;
     }
@@ -439,6 +446,20 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               maxLength: 191,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(labelText: 'Nome'),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _pixController,
+              enabled: !_saving,
+              maxLength: 140,
+              decoration: const InputDecoration(
+                labelText: 'Chave Pix (opcional)',
+                helperText:
+                    'Mostrada só aos passageiros aceitos nas suas caronas.',
+                helperMaxLines: 2,
+                prefixIcon: Icon(Icons.pix),
+              ),
               onSubmitted: (_) => _save(),
             ),
             if (_error != null) ...[
@@ -503,7 +524,7 @@ class _StatBox extends StatelessWidget {
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -596,7 +617,7 @@ class _Badge extends StatelessWidget {
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11.5,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),

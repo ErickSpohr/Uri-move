@@ -33,6 +33,24 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   TimeOfDay _time = const TimeOfDay(hour: 18, minute: 0);
   int _seats = 4;
   Vehicle? _vehicle;
+  bool _womenOnly = false;
+
+  // Repetição semanal: dias ISO (1 = segunda … 7 = domingo) até [_repeatUntil].
+  bool _repeat = false;
+  final Set<int> _repeatDays = {};
+  DateTime? _repeatUntil;
+
+  static const _weekdayLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  static const _weekdayNames = [
+    'segunda',
+    'terça',
+    'quarta',
+    'quinta',
+    'sexta',
+    'sábado',
+    'domingo',
+  ];
+
   bool _loading = true;
   bool _submitting = false;
 
@@ -82,9 +100,48 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       helpText: 'Data de partida',
     );
     if (picked != null) {
-      setState(() => _date = picked);
+      setState(() {
+        _date = picked;
+        if (_repeatUntil != null && _repeatUntil!.isBefore(picked)) {
+          _repeatUntil = picked;
+        }
+      });
     }
   }
+
+  DateTime get _maxRepeatUntil => DateUtils.dateOnly(
+    DateTime.now(),
+  ).add(const Duration(days: 60));
+
+  void _toggleRepeat(bool value) {
+    setState(() {
+      _repeat = value;
+      if (value) {
+        if (_repeatDays.isEmpty) {
+          _repeatDays.add(_date.weekday);
+        }
+        final suggested = _date.add(const Duration(days: 28));
+        _repeatUntil ??= suggested.isAfter(_maxRepeatUntil)
+            ? _maxRepeatUntil
+            : suggested;
+      }
+    });
+  }
+
+  Future<void> _pickRepeatUntil() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _repeatUntil ?? _date,
+      firstDate: _date,
+      lastDate: _maxRepeatUntil,
+      helpText: 'Repetir até',
+    );
+    if (picked != null) {
+      setState(() => _repeatUntil = picked);
+    }
+  }
+
+  String _isoDate(DateTime value) => value.toIso8601String().split('T').first;
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(
@@ -126,11 +183,17 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       );
       return;
     }
+    if (_repeat && _repeatDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Escolha ao menos um dia da semana.')),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
       final api = context.read<AuthController>().api;
-      await api.createRide(
+      final result = await api.createRide(
         vehicleId: '${_vehicle!.id}',
         origin: _originController.text.trim(),
         originLat: _originLat,
@@ -138,7 +201,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         destination: _destinationController.text.trim(),
         destinationLat: _destinationLat,
         destinationLng: _destinationLng,
-        departureDate: _date.toIso8601String().split('T').first,
+        departureDate: _isoDate(_date),
         departureTime:
             '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
         totalSeats: _seats,
@@ -146,12 +209,23 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
+        womenOnly: _womenOnly,
+        repeatDays: _repeat ? (_repeatDays.toList()..sort()) : const [],
+        repeatUntil: _repeat && _repeatUntil != null
+            ? _isoDate(_repeatUntil!)
+            : null,
       );
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Carona publicada com sucesso!')),
+        SnackBar(
+          content: Text(
+            result.created > 1
+                ? '${result.created} caronas publicadas!'
+                : 'Carona publicada com sucesso!',
+          ),
+        ),
       );
       widget.onCreated?.call();
     } on ApiException catch (e) {
@@ -319,7 +393,9 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                         Expanded(
                           child: TextField(
                             controller: _priceController,
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             decoration: const InputDecoration(
                               labelText: 'Preço por vaga (R\$)',
                               prefixIcon: Icon(Icons.attach_money),
@@ -349,14 +425,14 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                                 ),
                                 const Spacer(),
                                 IconButton(
-                                  visualDensity: VisualDensity.compact,
+                                  tooltip: 'Diminuir vagas',
                                   onPressed: _seats > 1
                                       ? () => setState(() => _seats--)
                                       : null,
                                   icon: const Icon(Icons.remove_circle_outline),
                                 ),
                                 IconButton(
-                                  visualDensity: VisualDensity.compact,
+                                  tooltip: 'Aumentar vagas',
                                   onPressed: _seats < (_vehicle?.seats ?? 4)
                                       ? () => setState(() => _seats++)
                                       : null,
@@ -369,6 +445,20 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
+                    _buildRepeatSection(context),
+                    if (context.watch<AuthController>().user?.isWoman ??
+                        false)
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.female),
+                        title: const Text('Somente para mulheres'),
+                        subtitle: const Text(
+                          'A carona só aparece para usuárias mulheres.',
+                        ),
+                        value: _womenOnly,
+                        onChanged: (v) => setState(() => _womenOnly = v),
+                      ),
+                    const SizedBox(height: 14),
                     TextField(
                       controller: _notesController,
                       maxLines: 3,
@@ -380,13 +470,70 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                     ),
                     const SizedBox(height: 22),
                     PrimaryButton(
-                      label: 'Publicar carona',
+                      label: _repeat ? 'Publicar caronas' : 'Publicar carona',
                       loading: _submitting,
                       onPressed: _submit,
                     ),
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildRepeatSection(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.repeat),
+            title: const Text('Repetir toda semana'),
+            subtitle: const Text('Publica de uma vez as próximas caronas.'),
+            value: _repeat,
+            onChanged: _toggleRepeat,
+          ),
+          if (_repeat) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var day = 1; day <= 7; day++)
+                  FilterChip(
+                    label: Text(_weekdayLabels[day - 1]),
+                    tooltip: _weekdayNames[day - 1],
+                    selected: _repeatDays.contains(day),
+                    onSelected: (selected) => setState(
+                      () => selected
+                          ? _repeatDays.add(day)
+                          : _repeatDays.remove(day),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _pickRepeatUntil,
+              icon: const Icon(Icons.event_repeat, size: 18),
+              label: Text(
+                'Até ${formatDate(_isoDate(_repeatUntil ?? _date))}',
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Máximo de 60 dias. Cada carona pode ser cancelada '
+              'sozinha ou junto com as próximas.',
+              style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+            ),
+          ],
+        ],
       ),
     );
   }

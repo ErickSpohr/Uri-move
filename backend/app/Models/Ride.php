@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'driver_id', 'vehicle_id', 'origin', 'origin_lat', 'origin_lng',
     'destination', 'destination_lat', 'destination_lng',
     'departure_date', 'departure_time', 'total_seats', 'available_seats',
-    'price', 'status', 'notes', 'is_recurring',
+    'price', 'status', 'notes', 'is_recurring', 'series_id', 'women_only',
 ])]
 class Ride extends Model
 {
@@ -30,6 +30,9 @@ class Ride extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    /** Limite de caronas criadas de uma vez por repetição semanal. */
+    public const MAX_SERIES_RIDES = 40;
+
     protected function casts(): array
     {
         return [
@@ -38,6 +41,7 @@ class Ride extends Model
             'available_seats' => 'integer',
             'price' => 'decimal:2',
             'is_recurring' => 'boolean',
+            'women_only' => 'boolean',
             'origin_lat' => 'decimal:8',
             'origin_lng' => 'decimal:8',
             'destination_lat' => 'decimal:8',
