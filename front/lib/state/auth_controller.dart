@@ -7,6 +7,7 @@ import '../core/api.dart';
 import '../core/push_notifications.dart';
 import '../models/models.dart';
 import '../services/api_repository.dart';
+import '../services/native_push.dart';
 import '../services/ride_location_sharer.dart';
 
 /// Estado global de autenticação e dados do usuário logado.
@@ -186,6 +187,7 @@ class AuthController extends ChangeNotifier {
     }
     // Antes de revogar o token, para o servidor ainda aceitar o encerramento.
     await locationSharer.stop();
+    await NativePush.unregister(_api);
     try {
       await _api.logout();
     } catch (_) {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../services/native_push.dart';
 import '../state/auth_controller.dart';
 import 'create_ride_screen.dart';
 import 'conversations_screen.dart';
@@ -31,8 +32,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _refreshUnread();
     _unreadTimer = Timer.periodic(_unreadPollInterval, (_) => _refreshUnread());
     WidgetsBinding.instance.addObserver(this);
+    final auth = context.read<AuthController>();
     // Retoma o envio da posição se o motorista tiver carona em andamento.
-    context.read<AuthController>().locationSharer.sync();
+    auth.locationSharer.sync();
+    // App Android: registra o aparelho para notificações com o app fechado.
+    NativePush.register(auth.api);
   }
 
   @override
