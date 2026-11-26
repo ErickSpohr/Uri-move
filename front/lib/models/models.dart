@@ -356,3 +356,59 @@ class ChatUnread {
     );
   }
 }
+
+/// Denúncia vista pelo painel de administração.
+class AdminReport {
+  AdminReport({
+    required this.id,
+    required this.reason,
+    required this.status,
+    this.reported,
+    this.reporter,
+    this.rideId,
+    this.details,
+    this.reportedReportsCount = 1,
+    this.createdAt,
+  });
+
+  final int id;
+  final String reason;
+  final String status;
+  final User? reported;
+  final User? reporter;
+  final int? rideId;
+  final String? details;
+
+  /// Total de denúncias recebidas pelo mesmo usuário (indica reincidência).
+  final int reportedReportsCount;
+  final String? createdAt;
+
+  AdminReport copyWith({String? status}) => AdminReport(
+    id: id,
+    reason: reason,
+    status: status ?? this.status,
+    reported: reported,
+    reporter: reporter,
+    rideId: rideId,
+    details: details,
+    reportedReportsCount: reportedReportsCount,
+    createdAt: createdAt,
+  );
+
+  factory AdminReport.fromJson(Map<String, dynamic> json) {
+    User? user(Object? value) => value is Map
+        ? User.fromJson(Map<String, dynamic>.from(value))
+        : null;
+    return AdminReport(
+      id: json['id'] as int,
+      reason: json['reason'] as String? ?? 'other',
+      status: json['status'] as String? ?? 'open',
+      reported: user(json['reported']),
+      reporter: user(json['reporter']),
+      rideId: json['ride_id'] as int?,
+      details: json['details'] as String?,
+      reportedReportsCount: json['reported_reports_count'] as int? ?? 1,
+      createdAt: json['created_at'] as String?,
+    );
+  }
+}

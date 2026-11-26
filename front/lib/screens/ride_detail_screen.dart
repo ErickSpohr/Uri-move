@@ -193,7 +193,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      color: const Color(0xFF3D5A80),
+      color: AppTheme.primary,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -442,7 +442,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                 title: 'Iniciar carona',
                 message: 'Iniciar esta carona agora?',
                 confirmLabel: 'Iniciar',
-                color: const Color(0xFF3D5A80),
+                color: AppTheme.primary,
                 action: () async =>
                     context.read<AuthController>().api.startRide(ride.id),
                 success: 'Carona iniciada.',
@@ -653,7 +653,7 @@ class _DriverCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    driver.ra != null ? 'RA ${driver.ra}' : driver.role ?? '',
+                    driver.course?.name ?? 'Motorista',
                     style: TextStyle(
                       fontSize: 13,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,

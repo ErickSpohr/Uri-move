@@ -17,6 +17,7 @@ class UpdateReportStatusRequest extends FormRequest
     {
         return [
             'status' => ['required', Rule::in([
+                Report::STATUS_OPEN,
                 Report::STATUS_REVIEWING,
                 Report::STATUS_RESOLVED,
                 Report::STATUS_DISMISSED,

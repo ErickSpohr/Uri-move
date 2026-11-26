@@ -8,6 +8,7 @@ import '../state/auth_controller.dart';
 import '../state/theme_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/vehicle_dialog.dart';
+import 'admin_reports_screen.dart';
 import 'blocked_users_screen.dart';
 import 'login_screen.dart';
 
@@ -260,6 +261,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  if (user?.isAdmin ?? false) ...[
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.admin_panel_settings_outlined),
+                        title: const Text('Painel de denúncias'),
+                        subtitle: const Text('Administração'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const AdminReportsScreen(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Card(
                     child: ListTile(
                       leading: const Icon(Icons.block),
