@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'onboarding_screen.dart';
-
 /// Ajuda do app (heurística 10 de Nielsen): passo a passo de cada parte.
 class HowItWorksScreen extends StatelessWidget {
   const HowItWorksScreen({super.key});
@@ -65,20 +63,7 @@ class HowItWorksScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (pageContext) => OnboardingScreen(
-                    onDone: () => Navigator.of(pageContext).pop(),
-                  ),
-                ),
-              ),
-              icon: const Icon(Icons.slideshow_outlined),
-              label: const Text('Ver a apresentação'),
-            ),
-          ),
+
           for (final (icon, title, steps) in _sections)
             Card(
               margin: const EdgeInsets.only(bottom: 10),
