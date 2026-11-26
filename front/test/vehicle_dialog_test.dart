@@ -87,6 +87,7 @@ void main() {
       'plate': 'ABC1D23',
       'year': 2015,
       'seats': 5,
+      'fuel_consumption': null,
     });
     expect(find.text('Editar veículo'), findsNothing);
   });
