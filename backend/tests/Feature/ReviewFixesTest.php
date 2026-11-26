@@ -123,7 +123,10 @@ class ReviewFixesTest extends TestCase
     {
         Sanctum::actingAs(User::factory()->create());
 
-        $this->getJson('/api/v1/rides?date=amanha')->assertUnprocessable()->assertJsonValidationErrors('date');
+        $this->getJson('/api/v1/rides?date=amanha')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('date')
+            ->assertJsonPath('errors.date.0', 'O campo data deve estar no formato Y-m-d.');
         $this->getJson('/api/v1/rides?from_time=25h')->assertUnprocessable()->assertJsonValidationErrors('from_time');
     }
 
