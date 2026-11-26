@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../screens/private_ride_chat_screen.dart';
+import '../screens/ride_chat_screen.dart';
 import '../screens/ride_detail_screen.dart';
 import '../widgets/in_app_notification.dart';
 import 'api_repository.dart';
@@ -24,6 +26,8 @@ class NativePush {
 
   static StreamSubscription<String>? _refresh;
   static StreamSubscription<RemoteMessage>? _foreground;
+  static StreamSubscription<RemoteMessage>? _opened;
+  static ApiRepository? _api;
 
   /// Navegador raiz: com o app aberto o Android não exibe a notificação na
   /// barra, então ela é mostrada no topo da tela (overlay do navegador).
@@ -78,7 +82,14 @@ class NativePush {
       _refresh ??= messaging.onTokenRefresh.listen(
         (token) => api.registerDevice(token).catchError((_) {}),
       );
+      _api = api;
       _foreground ??= FirebaseMessaging.onMessage.listen(_showInApp);
+      // Toque na notificação da barra com o app em segundo plano ou fechado.
+      _opened ??= FirebaseMessaging.onMessageOpenedApp.listen(
+        (message) => open(message.data),
+      );
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) open(initial.data);
       lastError = null;
       return true;
     } catch (error) {
@@ -92,20 +103,43 @@ class NativePush {
     final notification = message.notification;
     final navigator = navigatorKey.currentState;
     if (notification == null || navigator == null) return;
-    final rideId = int.tryParse('${message.data['ride_id'] ?? ''}');
     InAppNotification.show(
       navigator.overlay!,
       title: notification.title ?? 'URI Move',
       body: notification.body,
       type: message.data['type'] as String?,
-      // Toque abre a carona relacionada, quando houver.
-      onTap: rideId == null
-          ? null
-          : () => navigator.push(
-              MaterialPageRoute<void>(
-                builder: (_) => RideDetailScreen(rideId: rideId),
-              ),
-            ),
+      onTap: () => open(message.data),
+    );
+  }
+
+  /// Abre a tela da notificação: mensagens vão para o chat (privado ou do
+  /// grupo); o restante, para o detalhe da carona.
+  static Future<void> open(Map<String, dynamic> data) async {
+    final navigator = navigatorKey.currentState;
+    final rideId = int.tryParse('${data['ride_id'] ?? ''}');
+    if (navigator == null || rideId == null) return;
+
+    if (data['type'] == 'chat_message' && _api != null) {
+      try {
+        final ride = await _api!.ride(rideId);
+        final fromUserId = int.tryParse('${data['from_user_id'] ?? ''}');
+        final Widget screen;
+        if (fromUserId == null) {
+          screen = RideChatScreen(ride: ride);
+        } else {
+          final other = fromUserId == ride.driver.id
+              ? ride.driver
+              : await _api!.userProfile(fromUserId);
+          screen = PrivateRideChatScreen(ride: ride, otherUser: other);
+        }
+        await navigator.push(MaterialPageRoute<void>(builder: (_) => screen));
+        return;
+      } catch (_) {
+        // Sem conexão ou sem acesso ao chat: cai no detalhe da carona.
+      }
+    }
+    await navigator.push(
+      MaterialPageRoute<void>(builder: (_) => RideDetailScreen(rideId: rideId)),
     );
   }
 
