@@ -365,6 +365,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                       },
                       label: 'Origem',
                       icon: Icons.trip_origin,
+                      currentLocation: CurrentLocationMode.address,
                     ),
                     const SizedBox(height: 14),
                     AddressAutocompleteField(

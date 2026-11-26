@@ -13,6 +13,7 @@ class AddressAutocompleteField extends StatefulWidget {
     required this.label,
     required this.icon,
     this.onSelected,
+    this.currentLocation = CurrentLocationMode.none,
   });
 
   final TextEditingController controller;
@@ -20,9 +21,23 @@ class AddressAutocompleteField extends StatefulWidget {
   final IconData icon;
   final void Function(double? latitude, double? longitude)? onSelected;
 
+  /// Oferece "Usar minha localização atual" e define o texto preenchido.
+  final CurrentLocationMode currentLocation;
+
   @override
   State<AddressAutocompleteField> createState() =>
       _AddressAutocompleteFieldState();
+}
+
+enum CurrentLocationMode {
+  /// Sem opção de localização atual.
+  none,
+
+  /// Preenche o endereço (rua, número, bairro, cidade): para publicar carona.
+  address,
+
+  /// Preenche só a cidade: para a busca, que compara texto da origem.
+  city,
 }
 
 class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
@@ -35,7 +50,11 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   Map<String, (double, double)> _coordinates = {};
   List<String> _history = [];
   bool _loading = false;
+  bool _locating = false;
   bool _showSuggestions = false;
+
+  /// Suprime a busca disparada pelo listener ao preencher o texto via GPS.
+  bool _settingText = false;
   int _requestId = 0;
 
   @override
@@ -87,6 +106,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   }
 
   void _onTextChanged() {
+    if (_settingText) return;
     widget.onSelected?.call(null, null);
     final query = widget.controller.text.trim();
     _debounce?.cancel();
@@ -111,13 +131,98 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     });
   }
 
+  bool get _offersCurrentLocation =>
+      widget.currentLocation != CurrentLocationMode.none;
+
   void _showHistory() {
     if (!_focusNode.hasFocus) return;
     setState(() {
       _suggestions = _history.take(5).toList();
-      _showSuggestions = _suggestions.isNotEmpty;
+      // Com campo vazio a lista também mostra "Usar minha localização atual".
+      _showSuggestions = _suggestions.isNotEmpty || _offersCurrentLocation;
       _loading = false;
     });
+  }
+
+  Future<void> _useCurrentLocation() async {
+    if (_locating) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _locating = true;
+      _showSuggestions = false;
+    });
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw StateError('Ative a localização do celular.');
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw StateError('Permita o acesso à localização para usar esta opção.');
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      final label = await _reverseGeocode(position) ?? 'Minha localização';
+      if (!mounted) return;
+      _settingText = true;
+      widget.controller.value = TextEditingValue(
+        text: label,
+        selection: TextSelection.collapsed(offset: label.length),
+      );
+      _settingText = false;
+      widget.onSelected?.call(position.latitude, position.longitude);
+      _focusNode.unfocus();
+    } on StateError catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Não foi possível obter sua localização.')),
+      );
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  /// Endereço legível da posição (Nominatim /reverse); null se falhar.
+  Future<String?> _reverseGeocode(Position position) async {
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+        'lat': '${position.latitude}',
+        'lon': '${position.longitude}',
+        'format': 'jsonv2',
+        'addressdetails': '1',
+        'zoom': '18',
+      });
+      final response = await http
+          .get(uri, headers: {'User-Agent': _userAgent})
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return null;
+      final address =
+          (jsonDecode(response.body) as Map<String, dynamic>)['address'] as Map?;
+      if (address == null) return null;
+      final city = address['city'] ?? address['town'] ?? address['village'] ?? address['municipality'];
+      if (widget.currentLocation == CurrentLocationMode.city) {
+        return city as String?;
+      }
+      final street = [address['road'], address['house_number']]
+          .whereType<String>()
+          .join(', ');
+      final parts = [
+        if (street.isNotEmpty) street,
+        address['suburb'] ?? address['neighbourhood'],
+        city,
+      ].whereType<String>().toList();
+      return parts.isEmpty ? null : parts.join(' - ');
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _search(String query) async {
@@ -221,7 +326,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
             labelText: widget.label,
             hintText: widget.label,
             prefixIcon: Icon(widget.icon),
-            suffixIcon: _loading
+            suffixIcon: _loading || _locating
                 ? const Padding(
                     padding: EdgeInsets.all(14),
                     child: SizedBox.square(
@@ -229,16 +334,34 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   )
+                : _offersCurrentLocation
+                ? IconButton(
+                    tooltip: 'Usar minha localização atual',
+                    icon: const Icon(Icons.my_location),
+                    onPressed: _useCurrentLocation,
+                  )
                 : null,
           ),
         ),
-        if (_showSuggestions && _suggestions.isNotEmpty)
+        if (_showSuggestions &&
+            (_suggestions.isNotEmpty ||
+                (_offersCurrentLocation && widget.controller.text.trim().isEmpty)))
           Card(
             margin: const EdgeInsets.only(top: 4),
             clipBehavior: Clip.antiAlias,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_offersCurrentLocation && widget.controller.text.trim().isEmpty)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.my_location,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: const Text('Usar minha localização atual'),
+                    onTap: _useCurrentLocation,
+                  ),
                 for (final suggestion in _suggestions)
                   ListTile(
                     dense: true,
