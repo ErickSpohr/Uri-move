@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -80,10 +82,53 @@ class Ride extends Model
 
     public function canUseChat(User $user): bool
     {
-        return $this->driver_id === $user->id || $this->passengers()
+        if ($this->driver_id === $user->id) {
+            return true;
+        }
+
+        // Usa a relação pré-carregada por viewerContext() para evitar uma consulta por carona.
+        if ($this->relationLoaded('viewerPassengers')) {
+            return $this->viewerPassengers->isNotEmpty();
+        }
+
+        return $this->passengers()
             ->where('passenger_id', $user->id)
             ->whereIn('status', [RidePassenger::STATUS_CONFIRMED, RidePassenger::STATUS_COMPLETED])
             ->exists();
+    }
+
+    /**
+     * Solicitações do usuário que está vendo a carona (filtrada no eager load), mais recente primeiro.
+     */
+    public function viewerRequests(): HasMany
+    {
+        return $this->hasMany(RideRequest::class)->latest('id');
+    }
+
+    /**
+     * Participação confirmada/concluída do usuário que está vendo a carona (filtrada no eager load).
+     */
+    public function viewerPassengers(): HasMany
+    {
+        return $this->hasMany(RidePassenger::class)
+            ->whereIn('status', [RidePassenger::STATUS_CONFIRMED, RidePassenger::STATUS_COMPLETED]);
+    }
+
+    /**
+     * Pré-carrega o que RideResource precisa sobre o usuário atual (chat e status da solicitação),
+     * em duas consultas no total em vez de duas por carona.
+     */
+    #[Scope]
+    protected function viewerContext(Builder $query, ?User $viewer): void
+    {
+        if (! $viewer) {
+            return;
+        }
+
+        $query->with([
+            'viewerRequests' => fn ($requests) => $requests->where('passenger_id', $viewer->id),
+            'viewerPassengers' => fn ($passengers) => $passengers->where('passenger_id', $viewer->id),
+        ]);
     }
 
     public function ratings(): HasMany

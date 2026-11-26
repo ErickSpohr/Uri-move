@@ -160,6 +160,7 @@ class Ride {
     this.notes,
     this.isRecurring = false,
     this.myRequestStatus,
+    this.myRequestId,
     this.pendingRequestsCount = 0,
     this.canChat = false,
   });
@@ -180,6 +181,7 @@ class Ride {
   final String? notes;
   final bool isRecurring;
   final String? myRequestStatus;
+  final int? myRequestId;
   final int pendingRequestsCount;
   final bool canChat;
 
@@ -209,6 +211,7 @@ class Ride {
     notes: json['notes'] as String?,
     isRecurring: json['is_recurring'] as bool? ?? false,
     myRequestStatus: json['my_request_status'] as String?,
+    myRequestId: json['my_request_id'] as int?,
     pendingRequestsCount: json['pending_requests_count'] as int? ?? 0,
     canChat: json['can_chat'] as bool? ?? false,
   );

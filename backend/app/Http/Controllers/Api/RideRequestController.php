@@ -34,6 +34,11 @@ class RideRequestController extends Controller
     {
         abort_if($ride->driver_id === $request->user()->id, 422, 'Você não pode solicitar a sua própria carona.');
         abort_if($ride->status !== Ride::STATUS_SCHEDULED, 422, 'A carona não está disponível para solicitação.');
+        abort_if(
+            $request->user()->hasBlocked($ride->driver_id) || $request->user()->isBlockedBy($ride->driver_id),
+            403,
+            'Não é possível solicitar esta carona.',
+        );
 
         $hasActiveRequest = $ride->requests()
             ->where('passenger_id', $request->user()->id)
@@ -89,6 +94,12 @@ class RideRequestController extends Controller
         abort_if($rideRequest->ride_id !== $ride->id, 404, 'Solicitação não encontrada nesta carona.');
         abort_if($rideRequest->passenger_id !== $request->user()->id, 403, 'Você não pode cancelar esta solicitação.');
         abort_if(in_array($rideRequest->status, [RideRequest::STATUS_REJECTED, RideRequest::STATUS_CANCELLED], true), 422, 'Esta solicitação não pode mais ser cancelada.');
+        // Vaga confirmada só pode ser liberada antes da partida; depois disso a participação vale para avaliações.
+        abort_if(
+            $rideRequest->status === RideRequest::STATUS_ACCEPTED && $ride->status !== Ride::STATUS_SCHEDULED,
+            422,
+            'A carona já começou ou terminou; não é possível cancelar a vaga.',
+        );
 
         DB::transaction(function () use ($ride, $rideRequest) {
             $wasAccepted = $rideRequest->status === RideRequest::STATUS_ACCEPTED;

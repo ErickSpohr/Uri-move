@@ -13,6 +13,7 @@ use App\Services\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
@@ -21,9 +22,12 @@ class AuthController extends Controller
 
     public function register(RegisterRequest $request): JsonResponse
     {
-        $user = User::create($request->safe()->except(['password_confirmation']));
-
-        $this->emailVerification->send($user);
+        // Se o e-mail com o código não puder ser enviado, o cadastro é desfeito:
+        // assim o usuário pode tentar de novo sem cair em "e-mail já cadastrado".
+        DB::transaction(function () use ($request) {
+            $user = User::create($request->safe()->except(['password_confirmation']));
+            $this->emailVerification->send($user);
+        });
 
         return response()->json([
             'message' => 'Cadastro realizado. Enviamos um código de verificação para o seu e-mail institucional.',
@@ -50,7 +54,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'E-mail verificado com sucesso.',
             'token' => $token,
-            'user' => new UserResource($user->load('course', 'campus')),
+            'user' => UserResource::owner($user->load('course', 'campus')),
         ]);
     }
 
@@ -90,7 +94,7 @@ class AuthController extends Controller
                     ? 'E-mail ainda não verificado. Um novo código foi enviado.'
                     : 'E-mail ainda não verificado. Use o código enviado recentemente.',
                 'requires_email_verification' => true,
-                'user' => new UserResource($user->load('course', 'campus')),
+                'user' => UserResource::owner($user->load('course', 'campus')),
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -105,7 +109,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Autenticado com sucesso.',
             'token' => $token,
-            'user' => new UserResource($user->load('course', 'campus')),
+            'user' => UserResource::owner($user->load('course', 'campus')),
         ]);
     }
 

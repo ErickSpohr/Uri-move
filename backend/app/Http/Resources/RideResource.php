@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Models\RideRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -33,21 +35,28 @@ class RideResource extends JsonResource
             'status' => $this->status,
             'notes' => $this->notes,
             'is_recurring' => $this->is_recurring,
-            'my_request_status' => $authUser
-                ? $this->whenHasRequest($authUser)
-                : null,
+            'my_request_status' => $authUser ? $this->viewerRequest($authUser)?->status : null,
+            'my_request_id' => $authUser ? $this->viewerRequest($authUser)?->id : null,
             'created_at' => $this->created_at,
         ];
     }
 
-    private function whenHasRequest($user): ?string
-    {
-        if ($this->relationLoaded('requests')) {
-            $req = $this->requests->first(fn ($r) => $r->passenger_id === $user->id);
+    private ?RideRequest $viewerRequestCache = null;
 
-            return $req?->status;
+    private bool $viewerRequestResolved = false;
+
+    /**
+     * Solicitação mais recente do usuário nesta carona (consultada uma única vez por recurso).
+     */
+    private function viewerRequest(User $user): ?RideRequest
+    {
+        if (! $this->viewerRequestResolved) {
+            $this->viewerRequestCache = $this->relationLoaded('viewerRequests')
+                ? $this->viewerRequests->first(fn ($r) => $r->passenger_id === $user->id)
+                : $this->requests()->where('passenger_id', $user->id)->latest('id')->first();
+            $this->viewerRequestResolved = true;
         }
 
-        return optional($this->requests()->where('passenger_id', $user->id)->first())->status;
+        return $this->viewerRequestCache;
     }
 }

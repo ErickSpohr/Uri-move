@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // e os limites por IP seriam compartilhados entre todos os usuários.
         $middleware->trustProxies(at: '*');
 
+        // API sem rota "login": visitantes não autenticados recebem 401 em JSON, não redirecionamento.
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : '/');
+
         $middleware->alias([
             'auth.admin' => EnsureUserIsAdmin::class,
         ]);

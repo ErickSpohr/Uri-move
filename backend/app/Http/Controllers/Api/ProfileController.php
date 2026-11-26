@@ -8,6 +8,7 @@ use App\Http\Resources\RideRequestResource;
 use App\Http\Resources\RideResource;
 use App\Http\Resources\UserResource;
 use App\Models\Ride;
+use App\Models\RidePassenger;
 use App\Models\RideRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,7 @@ class ProfileController extends Controller
 {
     public function me(Request $request)
     {
-        return new UserResource($request->user()->load('course', 'campus'));
+        return UserResource::owner($request->user()->load('course', 'campus'));
     }
 
     public function update(UpdateProfileRequest $request): JsonResponse
@@ -46,7 +47,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => 'Perfil atualizado.',
-            'user' => new UserResource($user->refresh()->load('course', 'campus')),
+            'user' => UserResource::owner($user->refresh()->load('course', 'campus')),
         ]);
     }
 
@@ -75,6 +76,7 @@ class ProfileController extends Controller
     {
         $rides = $request->user()->drives()
             ->with(['driver', 'vehicle'])
+            ->viewerContext($request->user())
             ->orderByDesc('departure_date')
             ->paginate(15);
 
@@ -84,7 +86,10 @@ class ProfileController extends Controller
     public function joinedRides(Request $request)
     {
         $rides = Ride::with(['driver', 'vehicle'])
-            ->whereIn('id', $request->user()->ridePassengers()->pluck('ride_id'))
+            ->viewerContext($request->user())
+            ->whereIn('id', $request->user()->ridePassengers()
+                ->whereIn('status', [RidePassenger::STATUS_CONFIRMED, RidePassenger::STATUS_COMPLETED])
+                ->select('ride_id'))
             ->where('status', '!=', Ride::STATUS_CANCELLED)
             ->orderByDesc('departure_date')
             ->paginate(15);
@@ -94,7 +99,12 @@ class ProfileController extends Controller
 
     public function myRequests(Request $request)
     {
-        $requests = RideRequest::with(['ride.driver', 'ride.vehicle'])
+        $viewer = $request->user();
+        $requests = RideRequest::with([
+            'ride' => fn ($ride) => $ride->viewerContext($viewer),
+            'ride.driver',
+            'ride.vehicle',
+        ])
             ->where('passenger_id', $request->user()->id)
             ->orderByDesc('created_at')
             ->paginate(15);
