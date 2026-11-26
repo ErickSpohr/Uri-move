@@ -1,0 +1,6 @@
+{
+    "(and :count more error)": "(e mais :count erro)",
+    "(and :count more errors)": "(e mais :count erros)",
+    "Too Many Attempts.": "Muitas tentativas. Aguarde e tente novamente.",
+    "Unauthenticated.": "Sessão expirada. Entre novamente."
+}
