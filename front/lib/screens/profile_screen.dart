@@ -261,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (user?.isAdmin ?? false) ...[
+                  if (user.isAdmin) ...[
                     Card(
                       child: ListTile(
                         leading: const Icon(Icons.admin_panel_settings_outlined),
