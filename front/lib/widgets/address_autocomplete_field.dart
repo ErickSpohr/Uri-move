@@ -4,8 +4,25 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../screens/pickup_picker_screen.dart';
+import '../services/place_search.dart';
+
+enum CurrentLocationMode {
+  /// Sem opção de localização atual.
+  none,
+
+  /// Preenche o endereço (rua, número, bairro, cidade): para publicar carona.
+  address,
+
+  /// Preenche só a cidade: para a busca, que compara texto da origem.
+  city,
+}
+
+/// Campo de endereço com sugestões (Photon/OpenStreetMap), atalhos dos câmpus
+/// da URI, histórico, localização atual e escolha manual no mapa.
 class AddressAutocompleteField extends StatefulWidget {
   const AddressAutocompleteField({
     super.key,
@@ -19,9 +36,10 @@ class AddressAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final IconData icon;
+
+  /// Coordenadas do lugar escolhido; (null, null) quando o texto é editado à mão.
   final void Function(double? latitude, double? longitude)? onSelected;
 
-  /// Oferece "Usar minha localização atual" e define o texto preenchido.
   final CurrentLocationMode currentLocation;
 
   @override
@@ -29,33 +47,28 @@ class AddressAutocompleteField extends StatefulWidget {
       _AddressAutocompleteFieldState();
 }
 
-enum CurrentLocationMode {
-  /// Sem opção de localização atual.
-  none,
-
-  /// Preenche o endereço (rua, número, bairro, cidade): para publicar carona.
-  address,
-
-  /// Preenche só a cidade: para a busca, que compara texto da origem.
-  city,
-}
-
 class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
-  static const _historyKey = 'address_search_history';
+  static const _historyKey = 'address_history_v2';
   static const _userAgent = 'URI Move/1.0 (address autocomplete)';
 
   final _focusNode = FocusNode();
+  final _places = PlaceSearch();
   Timer? _debounce;
-  List<String> _suggestions = [];
-  Map<String, (double, double)> _coordinates = {};
-  List<String> _history = [];
+  List<PlaceSuggestion> _suggestions = [];
+  List<PlaceSuggestion> _history = [];
   bool _loading = false;
   bool _locating = false;
   bool _showSuggestions = false;
-
-  /// Suprime a busca disparada pelo listener ao preencher o texto via GPS.
-  bool _settingText = false;
+  bool _searchFailed = false;
   int _requestId = 0;
+
+  /// Suprime a busca disparada pelo listener quando o texto é preenchido pelo app.
+  bool _settingText = false;
+
+  bool get _offersCurrentLocation =>
+      widget.currentLocation != CurrentLocationMode.none;
+
+  bool get _isEmpty => widget.controller.text.trim().isEmpty;
 
   @override
   void initState() {
@@ -85,19 +98,37 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
 
   Future<void> _loadHistory() async {
     final preferences = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _history = preferences.getStringList(_historyKey) ?? [];
-      });
+    final raw = preferences.getStringList(_historyKey) ?? const [];
+    final history = <PlaceSuggestion>[];
+    for (final item in raw) {
+      try {
+        history.add(
+          PlaceSuggestion.fromJson(jsonDecode(item) as Map<String, dynamic>),
+        );
+      } catch (_) {}
     }
+    if (mounted) setState(() => _history = history);
+  }
+
+  Future<void> _remember(PlaceSuggestion place) async {
+    final history = [
+      place,
+      ..._history.where((item) => item.label != place.label),
+    ].take(6).toList();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setStringList(
+      _historyKey,
+      [for (final item in history) jsonEncode(item.toJson())],
+    );
+    if (mounted) setState(() => _history = history);
   }
 
   void _onFocusChanged() {
-    if (_focusNode.hasFocus && widget.controller.text.trim().isEmpty) {
-      _showHistory();
-    } else if (!_focusNode.hasFocus) {
+    if (_focusNode.hasFocus) {
+      if (_isEmpty) _showHistory();
+    } else {
       // Aguarda o toque na sugestão antes de ocultar a lista.
-      Future<void>.delayed(const Duration(milliseconds: 150), () {
+      Future<void>.delayed(const Duration(milliseconds: 200), () {
         if (mounted && !_focusNode.hasFocus) {
           setState(() => _showSuggestions = false);
         }
@@ -114,34 +145,80 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
       _showHistory();
       return;
     }
-    if (query.length < 3) {
-      setState(() {
-        _suggestions = [];
-        _showSuggestions = false;
-      });
-      return;
-    }
-
     setState(() {
+      // Câmpus aparecem na hora; o restante chega após a busca.
+      _suggestions = PlaceSearch.matchCampuses(query);
       _showSuggestions = true;
-      _loading = true;
+      _searchFailed = false;
+      _loading = query.length >= 3;
     });
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _search(query);
-    });
+    if (query.length >= 3) {
+      _debounce = Timer(const Duration(milliseconds: 300), () => _search(query));
+    }
   }
-
-  bool get _offersCurrentLocation =>
-      widget.currentLocation != CurrentLocationMode.none;
 
   void _showHistory() {
     if (!_focusNode.hasFocus) return;
     setState(() {
-      _suggestions = _history.take(5).toList();
-      // Com campo vazio a lista também mostra "Usar minha localização atual".
-      _showSuggestions = _suggestions.isNotEmpty || _offersCurrentLocation;
+      _suggestions = _history;
+      _showSuggestions = true;
+      _searchFailed = false;
       _loading = false;
     });
+  }
+
+  Future<(double, double)?> _lastKnownPosition() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final position = await Geolocator.getLastKnownPosition();
+      return position == null ? null : (position.latitude, position.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _search(String query) async {
+    final requestId = ++_requestId;
+    try {
+      final results = await _places.search(
+        query,
+        near: await _lastKnownPosition(),
+      );
+      if (!mounted || requestId != _requestId) return;
+      final campuses = PlaceSearch.matchCampuses(query);
+      setState(() {
+        _suggestions = [
+          ...campuses,
+          ...results.where(
+            (r) => !campuses.any((c) => c.label == r.label),
+          ),
+        ];
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _searchFailed = true;
+        _loading = false;
+      });
+    }
+  }
+
+  void _fill(PlaceSuggestion place) {
+    _settingText = true;
+    widget.controller.value = TextEditingValue(
+      text: place.label,
+      selection: TextSelection.collapsed(offset: place.label.length),
+    );
+    _settingText = false;
+    widget.onSelected?.call(place.latitude, place.longitude);
+    _focusNode.unfocus();
+    setState(() => _showSuggestions = false);
+    if (place.latitude != null) _remember(place);
   }
 
   Future<void> _useCurrentLocation() async {
@@ -169,16 +246,9 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
           timeLimit: Duration(seconds: 15),
         ),
       );
-      final label = await _reverseGeocode(position) ?? 'Minha localização';
-      if (!mounted) return;
-      _settingText = true;
-      widget.controller.value = TextEditingValue(
-        text: label,
-        selection: TextSelection.collapsed(offset: label.length),
-      );
-      _settingText = false;
-      widget.onSelected?.call(position.latitude, position.longitude);
-      _focusNode.unfocus();
+      final point = LatLng(position.latitude, position.longitude);
+      final label = await _reverseGeocode(point) ?? 'Minha localização';
+      if (mounted) _fill(PlaceSuggestion(label, point.latitude, point.longitude));
     } on StateError catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
@@ -190,12 +260,36 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     }
   }
 
+  /// Endereço não encontrado: o usuário marca o ponto no mapa. O texto já
+  /// digitado é mantido (ex.: rua e número), ganhando as coordenadas marcadas.
+  Future<void> _pickOnMap() async {
+    final typed = widget.controller.text.trim();
+    _focusNode.unfocus();
+    final picked = await Navigator.of(context).push<PickupPoint>(
+      MaterialPageRoute(
+        builder: (_) => PickupPickerScreen(
+          title: widget.label,
+          askLabel: false,
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final label = typed.isNotEmpty
+        ? typed
+        : await _reverseGeocode(picked.position) ?? 'Local marcado no mapa';
+    if (mounted) {
+      _fill(
+        PlaceSuggestion(label, picked.position.latitude, picked.position.longitude),
+      );
+    }
+  }
+
   /// Endereço legível da posição (Nominatim /reverse); null se falhar.
-  Future<String?> _reverseGeocode(Position position) async {
+  Future<String?> _reverseGeocode(LatLng point) async {
     try {
       final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
-        'lat': '${position.latitude}',
-        'lon': '${position.longitude}',
+        'lat': '${point.latitude}',
+        'lon': '${point.longitude}',
         'format': 'jsonv2',
         'addressdetails': '1',
         'zoom': '18',
@@ -207,7 +301,8 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
       final address =
           (jsonDecode(response.body) as Map<String, dynamic>)['address'] as Map?;
       if (address == null) return null;
-      final city = address['city'] ?? address['town'] ?? address['village'] ?? address['municipality'];
+      final city =
+          address['city'] ?? address['town'] ?? address['village'] ?? address['municipality'];
       if (widget.currentLocation == CurrentLocationMode.city) {
         return city as String?;
       }
@@ -225,96 +320,13 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     }
   }
 
-  Future<void> _search(String query) async {
-    final requestId = ++_requestId;
-    Position? position;
-    try {
-      if (await Geolocator.isLocationServiceEnabled() &&
-          await Geolocator.checkPermission() != LocationPermission.denied &&
-          await Geolocator.checkPermission() !=
-              LocationPermission.deniedForever) {
-        position = await Geolocator.getLastKnownPosition();
-      }
-    } catch (_) {
-      // As sugestões continuam funcionando sem usar a localização.
-    }
-
-    final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-      'q': query,
-      'format': 'jsonv2',
-      'addressdetails': '1',
-      'limit': '6',
-      'countrycodes': 'br',
-      if (position != null) 'viewbox': _viewbox(position),
-      if (position != null) 'bounded': '0',
-    });
-
-    try {
-      final response = await http
-          .get(uri, headers: {'User-Agent': _userAgent})
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) throw Exception('Place search failed');
-      final places = (jsonDecode(response.body) as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-      final results = places
-          .map((place) => place['display_name'] as String? ?? '')
-          .where((name) => name.isNotEmpty)
-          .toList();
-      final coordinates = <String, (double, double)>{};
-      for (final place in places) {
-        final name = place['display_name'] as String?;
-        final latitude = double.tryParse('${place['lat']}');
-        final longitude = double.tryParse('${place['lon']}');
-        if (name != null && latitude != null && longitude != null) {
-          coordinates[name] = (latitude, longitude);
-        }
-      }
-      if (!mounted || requestId != _requestId) return;
-      setState(() {
-        _suggestions = results;
-        _coordinates = coordinates;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted || requestId != _requestId) return;
-      setState(() {
-        _suggestions = [];
-        _loading = false;
-      });
-    }
-  }
-
-  String _viewbox(Position position) {
-    const delta = 0.5;
-    final west = position.longitude - delta;
-    final east = position.longitude + delta;
-    final north = position.latitude + delta;
-    final south = position.latitude - delta;
-    return '$west,$north,$east,$south';
-  }
-
-  Future<void> _select(String suggestion) async {
-    widget.controller.value = TextEditingValue(
-      text: suggestion,
-      selection: TextSelection.collapsed(offset: suggestion.length),
-    );
-    final coordinates = _coordinates[suggestion];
-    widget.onSelected?.call(coordinates?.$1, coordinates?.$2);
-    _focusNode.unfocus();
-    setState(() => _showSuggestions = false);
-
-    final history = [
-      suggestion,
-      ..._history.where((item) => item != suggestion),
-    ].take(8).toList();
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setStringList(_historyKey, history);
-    if (mounted) setState(() => _history = history);
-  }
-
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final query = widget.controller.text.trim();
+    final showCurrent = _offersCurrentLocation && query.isEmpty;
+    final showMapOption = query.isNotEmpty && !_loading;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -322,9 +334,10 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
         TextField(
           controller: widget.controller,
           focusNode: _focusNode,
+          textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             labelText: widget.label,
-            hintText: widget.label,
+            hintText: 'Rua, bairro, cidade ou "URI"',
             prefixIcon: Icon(widget.icon),
             suffixIcon: _loading || _locating
                 ? const Padding(
@@ -340,44 +353,65 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                     icon: const Icon(Icons.my_location),
                     onPressed: _useCurrentLocation,
                   )
-                : null,
+                : IconButton(
+                    tooltip: 'Marcar no mapa',
+                    icon: const Icon(Icons.map_outlined),
+                    onPressed: _pickOnMap,
+                  ),
           ),
         ),
         if (_showSuggestions &&
-            (_suggestions.isNotEmpty ||
-                (_offersCurrentLocation && widget.controller.text.trim().isEmpty)))
+            (showCurrent || _suggestions.isNotEmpty || showMapOption))
           Card(
             margin: const EdgeInsets.only(top: 4),
             clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_offersCurrentLocation && widget.controller.text.trim().isEmpty)
-                  ListTile(
-                    dense: true,
-                    leading: Icon(
-                      Icons.my_location,
-                      color: Theme.of(context).colorScheme.primary,
+            child: ConstrainedBox(
+              // Limita a altura para o teclado não esconder a lista toda.
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: ListView(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                children: [
+                  if (showCurrent)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(Icons.my_location, color: scheme.primary),
+                      title: const Text('Usar minha localização atual'),
+                      onTap: _useCurrentLocation,
                     ),
-                    title: const Text('Usar minha localização atual'),
-                    onTap: _useCurrentLocation,
-                  ),
-                for (final suggestion in _suggestions)
-                  ListTile(
-                    dense: true,
-                    leading: Icon(
-                      _history.contains(suggestion)
-                          ? Icons.history
-                          : Icons.location_on_outlined,
+                  for (final suggestion in _suggestions)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(
+                        PlaceSearch.campuses.contains(suggestion)
+                            ? Icons.school_outlined
+                            : _history.contains(suggestion)
+                            ? Icons.history
+                            : Icons.location_on_outlined,
+                      ),
+                      title: Text(
+                        suggestion.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => _fill(suggestion),
                     ),
-                    title: Text(
-                      suggestion,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  if (_searchFailed)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(Icons.wifi_off, color: scheme.error),
+                      title: const Text('Busca indisponível no momento.'),
                     ),
-                    onTap: () => _select(suggestion),
-                  ),
-              ],
+                  if (showMapOption)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(Icons.map_outlined, color: scheme.primary),
+                      title: const Text('Não achou? Marcar no mapa'),
+                      subtitle: const Text('Mantém o que você digitou'),
+                      onTap: _pickOnMap,
+                    ),
+                ],
+              ),
             ),
           ),
       ],
