@@ -12,6 +12,7 @@ import '../core/theme.dart';
 import '../models/models.dart';
 import '../services/api_repository.dart';
 import '../state/auth_controller.dart';
+import '../widgets/map_tiles.dart';
 
 /// Exibe a última posição compartilhada pelo motorista durante a carona.
 class RideTrackingScreen extends StatefulWidget {
@@ -278,15 +279,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
               mapController: _mapController,
               options: MapOptions(initialCenter: center, initialZoom: 14),
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'br.urimove.uri_move_app',
-                ),
+                AppMapTiles.layer(context),
                 MarkerLayer(markers: markers),
+                AppMapTiles.attribution(),
               ],
             ),
           ),
-          const Text('© OpenStreetMap contributors'),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
