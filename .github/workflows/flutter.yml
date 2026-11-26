@@ -30,5 +30,7 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Run tests
         run: flutter test
+      - name: Run browser tests
+        run: flutter test --platform chrome test/token_storage_web_test.dart
       - name: Build web
         run: flutter build web --release --dart-define=API_URL=https://example.invalid/api/v1
