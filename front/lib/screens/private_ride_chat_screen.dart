@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../core/api.dart';
 import '../models/models.dart';
 import '../state/auth_controller.dart';
+import '../widgets/user_safety.dart';
 
 /// Conversa privada entre o motorista e quem solicitou a carona.
 class PrivateRideChatScreen extends StatefulWidget {
@@ -121,7 +122,16 @@ class _PrivateRideChatScreenState extends State<PrivateRideChatScreen> {
     final messages = _messages.values.toList()
       ..sort((a, b) => (a['id'] as int).compareTo(b['id'] as int));
     return Scaffold(
-      appBar: AppBar(title: Text('Conversa com ${widget.otherUser.name}')),
+      appBar: AppBar(
+        title: Text('Conversa com ${widget.otherUser.name}'),
+        actions: [
+          UserSafetyMenu(
+            user: widget.otherUser,
+            rideId: widget.ride.id,
+            onBlocked: () => Navigator.of(context).maybePop(),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           if (_error != null)

@@ -8,6 +8,7 @@ import '../state/auth_controller.dart';
 import '../state/theme_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/vehicle_dialog.dart';
+import 'blocked_users_screen.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -256,6 +257,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: const Text('Usar cores escuras no aplicativo'),
                       value: context.watch<ThemeController>().darkMode,
                       onChanged: context.read<ThemeController>().setDarkMode,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.block),
+                      title: const Text('Usuários bloqueados'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const BlockedUsersScreen(),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

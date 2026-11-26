@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRatingRequest;
 use App\Http\Resources\RatingResource;
+use App\Http\Resources\UserResource;
 use App\Models\Rating;
 use App\Models\Ride;
 use App\Models\RidePassenger;
@@ -74,6 +75,38 @@ class RatingController extends Controller
             ->paginate(15);
 
         return response()->json(RatingResource::collection($ratings));
+    }
+
+    /**
+     * Participantes da carona (exceto o próprio usuário), indicando quem ele já avaliou.
+     */
+    public function participants(Request $request, Ride $ride): JsonResponse
+    {
+        $user = $request->user();
+        $this->assertParticipation($user, $ride);
+
+        $passengerIds = RidePassenger::where('ride_id', $ride->id)
+            ->whereIn('status', [RidePassenger::STATUS_CONFIRMED, RidePassenger::STATUS_COMPLETED])
+            ->pluck('passenger_id');
+
+        $participants = User::with(['course', 'campus'])
+            ->whereIn('id', $passengerIds->push($ride->driver_id)->unique())
+            ->where('id', '!=', $user->id)
+            ->get();
+
+        $ratedIds = Rating::where('ride_id', $ride->id)
+            ->where('rater_id', $user->id)
+            ->pluck('rated_id')
+            ->all();
+
+        return response()->json([
+            'can_rate' => $ride->status === Ride::STATUS_COMPLETED,
+            'data' => $participants->map(fn (User $participant) => [
+                'user' => new UserResource($participant),
+                'role' => $participant->id === $ride->driver_id ? 'driver' : 'passenger',
+                'already_rated' => in_array($participant->id, $ratedIds, true),
+            ])->values(),
+        ]);
     }
 
     private function assertParticipation(User $user, Ride $ride): void

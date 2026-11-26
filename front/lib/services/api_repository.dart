@@ -357,4 +357,60 @@ class ApiRepository {
       },
     );
   }
+
+  // ------------------------------------------------------------- Avaliações
+  Future<({bool canRate, List<RideParticipant> participants})> rideParticipants(
+    int rideId,
+  ) async {
+    final json = await client.get('/rides/$rideId/participants');
+    final map = Map<String, dynamic>.from(json as Map);
+    return (
+      canRate: map['can_rate'] as bool? ?? false,
+      participants: dataList(map)
+          .map(
+            (e) =>
+                RideParticipant.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList(),
+    );
+  }
+
+  Future<void> rateUser({
+    required int rideId,
+    required int ratedId,
+    required int score,
+    String? comment,
+  }) async {
+    await client.post(
+      '/ratings',
+      body: {
+        'ride_id': rideId,
+        'rated_id': ratedId,
+        'score': score,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
+      },
+    );
+  }
+
+  // ------------------------------------------------------------- Bloqueios
+  Future<List<User>> blockedUsers() async {
+    final json = await client.get('/blocks');
+    return dataList(json)
+        .map((e) => User.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<void> blockUser(int userId) async {
+    await client.post('/blocks', body: {'blocked_id': userId});
+  }
+
+  Future<void> unblockUser(int userId) async {
+    await client.delete('/blocks', query: {'user_id': '$userId'});
+  }
+
+  // ------------------------------------------------------------- Mensagens não lidas
+  Future<ChatUnread> chatUnread() async {
+    final json = await client.get('/chats/unread');
+    return ChatUnread.fromJson(Map<String, dynamic>.from(json as Map));
+  }
 }

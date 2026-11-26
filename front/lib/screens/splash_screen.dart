@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/theme.dart';
 import '../state/auth_controller.dart';
+import '../widgets/common.dart';
 import 'login_screen.dart';
 import 'main_shell.dart';
 
@@ -42,28 +42,8 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(26),
-              ),
-              child: const Icon(
-                Icons.directions_car,
-                size: 52,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'URI Move',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const AppLogo(height: 180),
+            const SizedBox(height: 12),
             Text(
               'Caronas entre universitários da URI',
               style: TextStyle(

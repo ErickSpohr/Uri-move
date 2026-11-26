@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreMessageRequest;
 use App\Models\Ride;
 use App\Models\RideChatMessage;
+use App\Models\RideChatRead;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +27,10 @@ class RideChatController extends Controller
                 $query->where('id', '<', $data['before_id']);
             }
             $messages = $query->orderByDesc('id')->limit(50)->get()->reverse()->values();
+        }
+
+        if ($messages->isNotEmpty()) {
+            RideChatRead::markRead($ride->id, $request->user()->id, (int) $messages->max('id'));
         }
 
         return response()->json(['data' => $messages]);

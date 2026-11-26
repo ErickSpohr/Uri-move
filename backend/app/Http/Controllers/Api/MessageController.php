@@ -40,6 +40,13 @@ class MessageController extends Controller
             ? $query->where('id', '>', $data['after_id'])->orderBy('id')->limit(50)->get()
             : $query->orderByDesc('id')->limit(50)->get()->reverse()->values();
 
+        // Abrir a conversa marca como lidas as mensagens recebidas nela.
+        $ride->messages()
+            ->where('receiver_id', $request->user()->id)
+            ->whereNull('read_at')
+            ->when($other, fn ($q) => $q->where('sender_id', $other))
+            ->update(['read_at' => now()]);
+
         return response()->json(['data' => MessageResource::collection($messages)]);
     }
 
