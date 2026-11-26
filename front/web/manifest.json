@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
-    "theme_color": "#023F75",
+    "theme_color": "#066C93",
     "description": "Caronas entre universitários da URI.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
