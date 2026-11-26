@@ -109,7 +109,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             const NavigationDestination(
               icon: Icon(Icons.directions_car_outlined),
               selectedIcon: Icon(Icons.directions_car),
-              label: 'Minhas caronas',
+              label: 'Caronas',
             ),
             const NavigationDestination(
               icon: Icon(Icons.add_circle_outline),
