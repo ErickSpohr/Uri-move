@@ -12,11 +12,17 @@ class ReportResource extends JsonResource
         return [
             'id' => $this->id,
             'reported' => new UserResource($this->whenLoaded('reported')),
+            'reporter' => new UserResource($this->whenLoaded('reporter')),
+            'reported_reports_count' => $this->when(
+                isset($this->reported_reports_count),
+                fn () => (int) $this->reported_reports_count,
+            ),
             'ride_id' => $this->ride_id,
             'reason' => $this->reason,
             'details' => $this->details,
             'status' => $this->status,
             'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

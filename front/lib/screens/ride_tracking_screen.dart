@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../core/theme.dart';
 import '../models/models.dart';
 import '../services/api_repository.dart';
 import '../state/auth_controller.dart';
@@ -246,7 +247,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
           point: _car!,
           width: 48,
           height: 48,
-          child: const Icon(Icons.directions_car, color: Colors.blue, size: 36),
+          child: const Icon(Icons.directions_car, color: AppTheme.primary, size: 36),
         ),
       if (destination != null)
         Marker(

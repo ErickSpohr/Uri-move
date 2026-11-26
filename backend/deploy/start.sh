@@ -20,6 +20,7 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
 fi
 
 php artisan config:cache --no-interaction
+php artisan users:make-admin --no-interaction || echo "Aviso: não foi possível sincronizar administradores."
 php artisan route:cache --no-interaction
 php artisan event:cache --no-interaction
 php artisan storage:link --no-interaction

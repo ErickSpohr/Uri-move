@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
 {
-    /** Inclui e-mail, telefone e gênero mesmo sem usuário autenticado na requisição (login/verificação). */
+    /** Inclui e-mail, telefone, RA e gênero mesmo sem usuário autenticado na requisição (login/verificação). */
     private bool $forOwner = false;
 
     /**
@@ -23,7 +23,7 @@ class UserResource extends JsonResource
 
     public function toArray(Request $request): array
     {
-        // Contato e dados pessoais só para o próprio usuário e para administradores.
+        // Contato, RA e dados pessoais só para o próprio usuário e para administradores.
         $viewer = $request->user();
         $canSeePrivate = $this->forOwner || ($viewer && ($viewer->id === $this->id || $viewer->isAdmin()));
 
@@ -33,7 +33,7 @@ class UserResource extends JsonResource
             'email' => $this->when($canSeePrivate, $this->email),
             'phone' => $this->when($canSeePrivate, $this->phone),
             'gender' => $this->when($canSeePrivate, $this->gender),
-            'ra' => $this->ra,
+            'ra' => $this->when($canSeePrivate, $this->ra),
             'role' => $this->role,
             'photo_url' => $this->photo_url,
             'is_verified' => $this->isVerified(),

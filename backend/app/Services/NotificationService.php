@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Report;
 use App\Models\User;
 use App\Models\UserNotification;
 
@@ -82,5 +83,17 @@ class NotificationService
             $driver,
             $payload,
         );
+    }
+
+    /**
+     * Avisa quem denunciou que a análise terminou (sem revelar a medida tomada).
+     */
+    public function notifyReportUpdated(User $reporter, string $status, array $payload = []): void
+    {
+        $message = $status === Report::STATUS_RESOLVED
+            ? 'Sua denúncia foi analisada e as medidas cabíveis foram tomadas.'
+            : 'Sua denúncia foi analisada e encerrada.';
+
+        $this->send($reporter, 'report_update', 'Denúncia analisada', $message, null, $payload + ['status' => $status]);
     }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api.dart';
+import '../core/theme.dart';
 import '../core/formats.dart';
 import '../models/models.dart';
 import '../state/auth_controller.dart';
@@ -119,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: _load,
-              color: const Color(0xFF3D5A80),
+              color: AppTheme.primary,
               child: _buildList(),
             ),
           ),

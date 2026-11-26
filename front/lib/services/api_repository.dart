@@ -363,6 +363,40 @@ class ApiRepository {
     );
   }
 
+  // ------------------------------------------------------------- Administração
+  /// Denúncias (somente administradores). [status] nulo lista todas.
+  Future<({List<AdminReport> reports, bool hasMore})> adminReports({
+    String? status,
+    int page = 1,
+  }) async {
+    final json = await client.get(
+      '/admin/reports',
+      query: {'page': '$page', 'status': ?status},
+    );
+    final map = Map<String, dynamic>.from(json as Map);
+    final meta = map['meta'] is Map
+        ? Map<String, dynamic>.from(map['meta'] as Map)
+        : const <String, dynamic>{};
+    final currentPage = meta['current_page'] as int? ?? page;
+    final lastPage = meta['last_page'] as int? ?? page;
+    return (
+      reports: dataList(map)
+          .map((e) => AdminReport.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      hasMore: currentPage < lastPage,
+    );
+  }
+
+  Future<AdminReport> updateReportStatus(int reportId, String status) async {
+    final json = await client.patch(
+      '/admin/reports/$reportId/status',
+      body: {'status': status},
+    );
+    return AdminReport.fromJson(
+      Map<String, dynamic>.from(dataMap(json)['report'] as Map),
+    );
+  }
+
   // ------------------------------------------------------------- Avaliações
   Future<({bool canRate, List<RideParticipant> participants})> rideParticipants(
     int rideId,

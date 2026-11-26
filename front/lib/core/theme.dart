@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primary = Color(0xFF3D5A80);
-  static const Color secondary = Color(0xFF98C1D9);
+  /// Azul institucional da URI (mesmo do logo).
+  static const Color primary = Color(0xFF066C93);
+  static const Color secondary = Color(0xFF8CCBE2);
   static const Color accent = Color(0xFFEE6C4D);
   static const Color background = Color(0xFFF4F6FA);
 
@@ -10,6 +11,7 @@ class AppTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: primary,
       primary: primary,
+      onPrimary: Colors.white,
       secondary: secondary,
       brightness: Brightness.light,
       surface: Colors.white,
@@ -22,11 +24,11 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF1B2A41),
+        foregroundColor: Color(0xFF0B3A4E),
         elevation: 0,
         scrolledUnderElevation: 1,
         titleTextStyle: TextStyle(
-          color: Color(0xFF1B2A41),
+          color: Color(0xFF0B3A4E),
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
@@ -81,7 +83,8 @@ class AppTheme {
     const surface = Color(0xFF1B2635);
     const background = Color(0xFF101924);
     const foreground = Color(0xFFEAF0F7);
-    const primaryLight = Color(0xFFAFCBF0);
+    // Tom claro do azul URI: contraste adequado sobre fundo escuro.
+    const primaryLight = Color(0xFF7CCBEA);
     final scheme = ColorScheme.fromSeed(
       seedColor: primaryLight,
       primary: primaryLight,
