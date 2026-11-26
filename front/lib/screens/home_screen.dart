@@ -215,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   controller: _originController,
                   label: 'Origem',
                   icon: Icons.trip_origin,
+                  currentLocation: CurrentLocationMode.city,
                 ),
               ),
               const SizedBox(width: 10),
