@@ -77,7 +77,9 @@ class ProfileController extends Controller
         $rides = $request->user()->drives()
             ->with(['driver', 'vehicle'])
             ->viewerContext($request->user())
-            ->orderByDesc('departure_date')
+            // Mais recentes primeiro (publicadas por último no topo).
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(15);
 
         return RideResource::collection($rides);
@@ -91,7 +93,8 @@ class ProfileController extends Controller
                 ->whereIn('status', [RidePassenger::STATUS_CONFIRMED, RidePassenger::STATUS_COMPLETED])
                 ->select('ride_id'))
             ->where('status', '!=', Ride::STATUS_CANCELLED)
-            ->orderByDesc('departure_date')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate(15);
 
         return RideResource::collection($rides);
