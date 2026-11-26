@@ -283,9 +283,6 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
-    return double.tryParse(text);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
