@@ -57,8 +57,17 @@ class _PrivateRideChatScreenState extends State<PrivateRideChatScreen> {
     if (_fetching) return;
     _fetching = true;
     try {
+      final lastId = _messages.isEmpty
+          ? null
+          : _messages.keys.reduce((a, b) => a > b ? a : b);
       final response = await _api
-          .get(_path, query: {'user_id': '${widget.otherUser.id}'})
+          .get(
+            _path,
+            query: {
+              'user_id': '${widget.otherUser.id}',
+              'after_id': ?lastId?.toString(),
+            },
+          )
           .timeout(const Duration(seconds: 15));
       if (!mounted) return;
       setState(() {

@@ -5,44 +5,63 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRideRequest;
 use App\Http\Resources\RideResource;
+use App\Models\Block;
 use App\Models\Ride;
 use App\Models\RidePassenger;
+use App\Models\RideRequest;
 use App\Models\Vehicle;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class RideController extends Controller
 {
+    public function __construct(private readonly NotificationService $notifications) {}
+
     public function index(Request $request)
     {
+        $filters = $request->validate([
+            'origin' => ['nullable', 'string', 'max:191'],
+            'destination' => ['nullable', 'string', 'max:191'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'from_time' => ['nullable', 'date_format:H:i'],
+            'to_time' => ['nullable', 'date_format:H:i'],
+            'price_max' => ['nullable', 'numeric', 'min:0'],
+        ]);
+        $viewer = $request->user();
+
         $query = Ride::query()
             ->with(['driver', 'vehicle'])
-            ->where('status', '!=', Ride::STATUS_CANCELLED)
-            ->where('status', '!=', Ride::STATUS_COMPLETED)
-            ->where('departure_date', '>=', $request->date ?? today()->toDateString());
+            ->viewerContext($viewer)
+            ->whereNotIn('status', [Ride::STATUS_CANCELLED, Ride::STATUS_COMPLETED])
+            ->where('departure_date', '>=', $filters['date'] ?? today()->toDateString())
+            // Caronas de quem o usuário bloqueou ou de quem o bloqueou não aparecem na busca.
+            ->whereNotIn('driver_id', $viewer->blocksGiven()->select('blocked_id'))
+            ->whereNotIn('driver_id', Block::query()->where('blocked_id', $viewer->id)->select('blocker_id'));
 
-        if ($request->filled('origin')) {
-            $query->where('origin', 'ilike', "%{$request->origin}%");
+        if (! empty($filters['origin'])) {
+            $query->where('origin', 'ilike', '%'.$filters['origin'].'%');
         }
 
-        if ($request->filled('destination')) {
-            $query->where('destination', 'ilike', "%{$request->destination}%");
+        if (! empty($filters['destination'])) {
+            $query->where('destination', 'ilike', '%'.$filters['destination'].'%');
         }
 
-        if ($request->filled('date')) {
-            $query->whereDate('departure_date', $request->date);
+        if (! empty($filters['date'])) {
+            $query->whereDate('departure_date', $filters['date']);
         }
 
-        if ($request->filled('from_time')) {
-            $query->where('departure_time', '>=', $request->from_time);
+        if (! empty($filters['from_time'])) {
+            $query->where('departure_time', '>=', $filters['from_time']);
         }
 
-        if ($request->filled('to_time')) {
-            $query->where('departure_time', '<=', $request->to_time);
+        if (! empty($filters['to_time'])) {
+            $query->where('departure_time', '<=', $filters['to_time']);
         }
 
-        if ($request->filled('price_max')) {
-            $query->where('price', '<=', (float) $request->price_max);
+        if (isset($filters['price_max'])) {
+            $query->where('price', '<=', (float) $filters['price_max']);
         }
 
         $rides = $query
@@ -77,6 +96,7 @@ class RideController extends Controller
     public function show(Request $request, Ride $ride): RideResource
     {
         $ride->load(['driver', 'vehicle']);
+        $ride->setRelation('viewerRequests', $ride->viewerRequests()->where('passenger_id', $request->user()->id)->get());
 
         if ($ride->driver_id === $request->user()->id) {
             $ride->loadCount('pendingRequests');
@@ -127,8 +147,27 @@ class RideController extends Controller
 
         abort_if(in_array($ride->status, [Ride::STATUS_COMPLETED, Ride::STATUS_CANCELLED], true), 422, 'A carona não pode mais ser cancelada.');
 
-        $ride->update(['status' => Ride::STATUS_CANCELLED]);
-        $ride->location()->delete();
+        $affectedPassengers = DB::transaction(function () use ($ride) {
+            $requests = $ride->requests()
+                ->with('passenger')
+                ->whereIn('status', [RideRequest::STATUS_PENDING, RideRequest::STATUS_ACCEPTED])
+                ->get();
+
+            $ride->requests()
+                ->whereIn('id', $requests->pluck('id'))
+                ->update(['status' => RideRequest::STATUS_CANCELLED, 'responded_at' => now()]);
+            $ride->passengers()
+                ->where('status', RidePassenger::STATUS_CONFIRMED)
+                ->update(['status' => RidePassenger::STATUS_CANCELLED]);
+            $ride->update(['status' => Ride::STATUS_CANCELLED]);
+            $ride->location()->delete();
+
+            return $requests->pluck('passenger')->filter()->unique('id');
+        });
+
+        foreach ($affectedPassengers as $passenger) {
+            $this->notifications->notifyRideCancelled($passenger, $request->user(), ['ride_id' => $ride->id]);
+        }
 
         return response()->json([
             'message' => 'Carona cancelada.',

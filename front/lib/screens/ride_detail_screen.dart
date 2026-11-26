@@ -499,9 +499,15 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     // Passageiro.
     if (ride.myRequestStatus != null) {
       final requested =
-          ride.myRequestStatus == 'pending' ||
-          ride.myRequestStatus == 'accepted';
-      return Container(
+          !ride.isCancelled &&
+          (ride.myRequestStatus == 'pending' ||
+              ride.myRequestStatus == 'accepted');
+      final canCancel =
+          ride.myRequestId != null &&
+          (ride.myRequestStatus == 'pending' ||
+              (ride.myRequestStatus == 'accepted' &&
+                  ride.status == 'scheduled'));
+      final statusBox = Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: requested
@@ -520,12 +526,45 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                _myRequestLabel(ride.myRequestStatus!),
+                ride.isCancelled
+                    ? 'Esta carona foi cancelada pelo motorista.'
+                    : _myRequestLabel(ride.myRequestStatus!),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
+      );
+      if (!canCancel) {
+        return statusBox;
+      }
+      final accepted = ride.myRequestStatus == 'accepted';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          statusBox,
+          const SizedBox(height: 8),
+          TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: _busy
+                ? null
+                : () => _confirmAction(
+                    title: accepted ? 'Liberar minha vaga' : 'Cancelar solicitação',
+                    message: accepted
+                        ? 'Sua vaga será liberada para outros passageiros.'
+                        : 'O motorista não verá mais sua solicitação.',
+                    confirmLabel: accepted ? 'Liberar vaga' : 'Cancelar solicitação',
+                    color: Colors.redAccent,
+                    action: () async => context
+                        .read<AuthController>()
+                        .api
+                        .cancelRequest(ride.id, ride.myRequestId!),
+                    success: accepted ? 'Vaga liberada.' : 'Solicitação cancelada.',
+                  ),
+            icon: const Icon(Icons.close),
+            label: Text(accepted ? 'Liberar minha vaga' : 'Cancelar solicitação'),
+          ),
+        ],
       );
     }
 

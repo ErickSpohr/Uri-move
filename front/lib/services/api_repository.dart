@@ -244,6 +244,11 @@ class ApiRepository {
         .toList();
   }
 
+  /// Passageiro cancela a própria solicitação (pendente, ou aceita antes da partida).
+  Future<void> cancelRequest(int rideId, int requestId) async {
+    await client.delete('/rides/$rideId/requests/$requestId');
+  }
+
   Future<void> respondRequest(int rideId, int requestId, String action) async {
     await client.patch(
       '/rides/$rideId/requests/$requestId',

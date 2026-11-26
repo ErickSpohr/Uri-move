@@ -59,6 +59,8 @@ String notificationTypeLabel(String? type) {
       return 'Solicitação recusada';
     case 'ride_request_cancelled':
       return 'Solicitação cancelada';
+    case 'ride_cancelled':
+      return 'Carona cancelada';
     case 'rating_received':
       return 'Nova avaliação';
     case 'report_update':
