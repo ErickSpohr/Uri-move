@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../screens/ride_detail_screen.dart';
+import '../widgets/in_app_notification.dart';
 import 'api_repository.dart';
 
 /// Notificações do app Android via Firebase Cloud Messaging.
@@ -23,9 +25,9 @@ class NativePush {
   static StreamSubscription<String>? _refresh;
   static StreamSubscription<RemoteMessage>? _foreground;
 
-  /// Mensageiro global para mostrar avisos com o app aberto (o Android só
-  /// exibe na barra quando o app está em segundo plano ou fechado).
-  static final messengerKey = GlobalKey<ScaffoldMessengerState>();
+  /// Navegador raiz: com o app aberto o Android não exibe a notificação na
+  /// barra, então ela é mostrada no topo da tela (overlay do navegador).
+  static final navigatorKey = GlobalKey<NavigatorState>();
 
   /// Último problema no registro, exibido no teste de notificações.
   static String? lastError;
@@ -88,18 +90,22 @@ class NativePush {
 
   static void _showInApp(RemoteMessage message) {
     final notification = message.notification;
-    if (notification == null) return;
-    messengerKey.currentState?.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        content: Text(
-          [notification.title, notification.body]
-              .whereType<String>()
-              .where((t) => t.isNotEmpty)
-              .join('\n'),
-        ),
-      ),
+    final navigator = navigatorKey.currentState;
+    if (notification == null || navigator == null) return;
+    final rideId = int.tryParse('${message.data['ride_id'] ?? ''}');
+    InAppNotification.show(
+      navigator.overlay!,
+      title: notification.title ?? 'URI Move',
+      body: notification.body,
+      type: message.data['type'] as String?,
+      // Toque abre a carona relacionada, quando houver.
+      onTap: rideId == null
+          ? null
+          : () => navigator.push(
+              MaterialPageRoute<void>(
+                builder: (_) => RideDetailScreen(rideId: rideId),
+              ),
+            ),
     );
   }
 

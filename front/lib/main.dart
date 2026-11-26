@@ -26,7 +26,7 @@ class URIMoveApp extends StatelessWidget {
       child: Consumer<ThemeController>(
         builder: (context, appearance, _) => MaterialApp(
           title: 'URI Move',
-          scaffoldMessengerKey: NativePush.messengerKey,
+          navigatorKey: NativePush.navigatorKey,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
