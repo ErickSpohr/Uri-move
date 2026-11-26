@@ -324,7 +324,6 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final query = widget.controller.text.trim();
-    final showCurrent = _offersCurrentLocation && query.isEmpty;
     final showMapOption = query.isNotEmpty && !_loading;
 
     return Column(
@@ -337,7 +336,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             labelText: widget.label,
-            hintText: 'Rua, bairro, cidade ou "URI"',
+            hintText: 'Rua, cidade ou "URI"',
             prefixIcon: Icon(widget.icon),
             suffixIcon: _loading || _locating
                 ? const Padding(
@@ -360,8 +359,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                   ),
           ),
         ),
-        if (_showSuggestions &&
-            (showCurrent || _suggestions.isNotEmpty || showMapOption))
+        if (_showSuggestions && (_suggestions.isNotEmpty || showMapOption))
           Card(
             margin: const EdgeInsets.only(top: 4),
             clipBehavior: Clip.antiAlias,
@@ -372,13 +370,6 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 children: [
-                  if (showCurrent)
-                    ListTile(
-                      dense: true,
-                      leading: Icon(Icons.my_location, color: scheme.primary),
-                      title: const Text('Usar minha localização atual'),
-                      onTap: _useCurrentLocation,
-                    ),
                   for (final suggestion in _suggestions)
                     ListTile(
                       dense: true,
