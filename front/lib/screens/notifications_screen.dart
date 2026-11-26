@@ -6,6 +6,7 @@ import '../core/theme.dart';
 import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/in_app_notification.dart';
 import '../widgets/push_toggle.dart';
 import 'ride_detail_screen.dart';
 
@@ -170,7 +171,8 @@ class _NotificationCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                Icons.notifications_outlined,
+                // Mesmo ícone por tipo usado no aviso do topo da tela.
+                InAppNotification.iconFor(item.type),
                 size: 22,
                 color: Theme.of(context).colorScheme.primary,
               ),
