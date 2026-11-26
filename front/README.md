@@ -26,4 +26,4 @@ flutter build web --release --dart-define=API_URL=https://SUA-API/api/v1
 
 Na Vercel, configure `front` como diretório raiz e `API_URL` como variável de ambiente. O `vercel.json` executa o script de build e configura as rotas da aplicação.
 
-O login web guarda o token por aba. As contas demonstrativas aparecem somente em modo de desenvolvimento. Credenciais da Brevo e do banco pertencem ao servidor; nunca devem ser incluídas no aplicativo.
+O login web fica salvo no navegador (localStorage) até o usuário sair da conta; para testar duas contas ao mesmo tempo, use uma janela anônima ou outro navegador. As contas demonstrativas aparecem somente em modo de desenvolvimento. Credenciais da Brevo e do banco pertencem ao servidor; nunca devem ser incluídas no aplicativo.
