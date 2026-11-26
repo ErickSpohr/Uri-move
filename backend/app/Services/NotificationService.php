@@ -114,4 +114,36 @@ class NotificationService
 
         $this->send($reporter, 'report_update', 'Denúncia analisada', $message, null, $payload + ['status' => $status]);
     }
+
+    /**
+     * Aviso só por push (navegador e Android), sem registro na lista de notificações:
+     * usado para mensagens de chat, que já têm contador de não lidas próprio.
+     *
+     * @param  iterable<User>  $users
+     * @param  array<string, mixed>  $data
+     */
+    public function pushOnly(iterable $users, string $title, ?string $body, array $data = []): void
+    {
+        $users = collect($users)->unique('id')->values();
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        defer(function () use ($users, $title, $body, $data) {
+            foreach ($users as $user) {
+                app(WebPushSender::class)->sendToUser($user, ['title' => $title, 'body' => $body] + $data);
+                app(FcmSender::class)->sendToUser($user, $title, $body, $data);
+            }
+        });
+    }
+
+    /**
+     * Prévia curta da mensagem para o corpo da notificação.
+     */
+    public static function preview(string $text, int $limit = 120): string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', $text));
+
+        return mb_strlen($text) > $limit ? mb_substr($text, 0, $limit - 1).'…' : $text;
+    }
 }

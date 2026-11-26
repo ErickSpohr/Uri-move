@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import 'api_repository.dart';
 
@@ -20,6 +21,14 @@ class NativePush {
   static const _projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
 
   static StreamSubscription<String>? _refresh;
+  static StreamSubscription<RemoteMessage>? _foreground;
+
+  /// Mensageiro global para mostrar avisos com o app aberto (o Android só
+  /// exibe na barra quando o app está em segundo plano ou fechado).
+  static final messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  /// Último problema no registro, exibido no teste de notificações.
+  static String? lastError;
 
   static bool get configured =>
       !kIsWeb &&
@@ -45,20 +54,53 @@ class NativePush {
   }
 
   /// Pede permissão (Android 13+) e registra o token do aparelho na API.
-  static Future<void> register(ApiRepository api) async {
+  /// Retorna true se o aparelho ficou registrado.
+  static Future<bool> register(ApiRepository api) async {
     try {
-      if (!await _init()) return;
+      if (!await _init()) {
+        lastError = 'App sem configuração do Firebase.';
+        return false;
+      }
       final messaging = FirebaseMessaging.instance;
       final settings = await messaging.requestPermission();
-      if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        lastError = 'Notificações bloqueadas nas configurações do Android.';
+        return false;
+      }
       final token = await messaging.getToken();
-      if (token != null) await api.registerDevice(token);
+      if (token == null) {
+        lastError = 'O Firebase não gerou o token do aparelho.';
+        return false;
+      }
+      await api.registerDevice(token);
       _refresh ??= messaging.onTokenRefresh.listen(
         (token) => api.registerDevice(token).catchError((_) {}),
       );
+      _foreground ??= FirebaseMessaging.onMessage.listen(_showInApp);
+      lastError = null;
+      return true;
     } catch (error) {
+      lastError = 'Falha ao registrar: $error';
       debugPrint('FCM indisponível: $error');
+      return false;
     }
+  }
+
+  static void _showInApp(RemoteMessage message) {
+    final notification = message.notification;
+    if (notification == null) return;
+    messengerKey.currentState?.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        content: Text(
+          [notification.title, notification.body]
+              .whereType<String>()
+              .where((t) => t.isNotEmpty)
+              .join('\n'),
+        ),
+      ),
+    );
   }
 
   /// Remove o aparelho da conta (logout), para o próximo usuário não receber

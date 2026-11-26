@@ -94,4 +94,46 @@ class FcmTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_test_endpoint_reports_missing_device(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/v1/push/devices/test')
+            ->assertOk()
+            ->assertJson(['configured' => true, 'devices' => 0, 'sent' => 0]);
+    }
+
+    public function test_private_chat_message_pushes_to_receiver_without_listing_notification(): void
+    {
+        Http::fake([
+            'oauth2.googleapis.com/*' => Http::response(['access_token' => 'ya29.test']),
+            'fcm.googleapis.com/*' => Http::response(['name' => 'ok']),
+        ]);
+        [$driver, $passenger] = User::factory()->count(2)->create();
+        DeviceToken::create(['user_id' => $driver->id, 'token' => 'driver-phone']);
+
+        Sanctum::actingAs($driver);
+        $rideId = $this->postJson('/api/v1/rides', [
+            'origin' => 'Cerro Largo', 'destination' => 'URI', 'departure_date' => now()->addDay()->toDateString(),
+            'departure_time' => '07:30', 'total_seats' => 3,
+        ])->json('ride.id');
+
+        Sanctum::actingAs($passenger);
+        $this->postJson("/api/v1/rides/{$rideId}/requests", ['pickup_lat' => -28.15, 'pickup_lng' => -54.74])->assertCreated();
+        $this->app->make(DeferredCallbackCollection::class)->forget('*');
+        Http::fake([
+            'oauth2.googleapis.com/*' => Http::response(['access_token' => 'ya29.test']),
+            'fcm.googleapis.com/*' => Http::response(['name' => 'ok']),
+        ]);
+        $before = $driver->notifications()->count();
+
+        $this->postJson("/api/v1/rides/{$rideId}/messages", ['body' => 'Posso levar mochila?'])->assertCreated();
+        $this->app->make(DeferredCallbackCollection::class)->invoke();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'messages:send')
+            && $request['message']['token'] === 'driver-phone'
+            && $request['message']['notification']['body'] === 'Posso levar mochila?');
+        $this->assertSame($before, $driver->notifications()->count());
+    }
 }
