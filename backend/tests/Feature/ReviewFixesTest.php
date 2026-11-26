@@ -109,6 +109,16 @@ class ReviewFixesTest extends TestCase
         }
     }
 
+    public function test_guest_can_search_rides(): void
+    {
+        Ride::factory()->create();
+
+        $this->getJson('/api/v1/rides')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.my_request_status', null);
+    }
+
     public function test_invalid_search_filters_return_validation_error(): void
     {
         Sanctum::actingAs(User::factory()->create());

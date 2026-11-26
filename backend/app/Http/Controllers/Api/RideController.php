@@ -35,10 +35,14 @@ class RideController extends Controller
             ->with(['driver', 'vehicle'])
             ->viewerContext($viewer)
             ->whereNotIn('status', [Ride::STATUS_CANCELLED, Ride::STATUS_COMPLETED])
-            ->where('departure_date', '>=', $filters['date'] ?? today()->toDateString())
+            ->where('departure_date', '>=', $filters['date'] ?? today()->toDateString());
+
+        // Rota pública: o filtro de bloqueio só se aplica a quem está logado.
+        if ($viewer) {
             // Caronas de quem o usuário bloqueou ou de quem o bloqueou não aparecem na busca.
-            ->whereNotIn('driver_id', $viewer->blocksGiven()->select('blocked_id'))
-            ->whereNotIn('driver_id', Block::query()->where('blocked_id', $viewer->id)->select('blocker_id'));
+            $query->whereNotIn('driver_id', $viewer->blocksGiven()->select('blocked_id'))
+                ->whereNotIn('driver_id', Block::query()->where('blocked_id', $viewer->id)->select('blocker_id'));
+        }
 
         if (! empty($filters['origin'])) {
             $query->where('origin', 'ilike', '%'.$filters['origin'].'%');
