@@ -183,34 +183,29 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Builder(
         builder: (context) {
-          // Teclado aberto: a busca ocupa a tela toda (com rolagem) para as
-          // sugestões caberem; mapa e lista voltam ao fechar o teclado.
-          // A árvore mantém o mesmo Flexible/SingleChildScrollView nos dois
-          // estados para o campo não perder o foco.
+          // A página inteira rola: busca, mapa e lista. Antes a busca e o mapa
+          // ficavam fixos e a lista sobrava numa faixa estreita no rodapé.
+          // Com o teclado aberto mapa e lista somem para as sugestões caberem;
+          // a busca é o primeiro sliver nos dois estados, então mantém o foco.
           final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
-          return Column(
-            children: [
-              Flexible(
-                flex: typing ? 1 : 0,
-                fit: typing ? FlexFit.tight : FlexFit.loose,
-                child: SingleChildScrollView(
-                  child: _buildSearchBar(context),
-                ),
-              ),
-              if (!typing) ...[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: LocationMap(),
-                ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _load,
-                    color: AppTheme.primary,
-                    child: _buildList(),
+          return RefreshIndicator(
+            onRefresh: _load,
+            color: AppTheme.primary,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _buildSearchBar(context)),
+                if (!typing) ...[
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: LocationMap(height: 140, scrollFriendly: true),
+                    ),
                   ),
-                ),
+                  ..._buildListSlivers(),
+                ],
               ],
-            ],
+            ),
           );
         },
       ),
@@ -326,69 +321,88 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildList() {
+  List<Widget> _buildListSlivers() {
+    final scheme = Theme.of(context).colorScheme;
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      ];
     }
     if (_error != null) {
-      return ListView(
-        children: [
-          const SizedBox(height: 120),
-          Padding(
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
-        ],
-      );
+        ),
+      ];
     }
     if (_rides.isEmpty) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const SizedBox(height: 60),
-          EmptyState(
-            icon: Icons.no_transfer_rounded,
-            message:
-                'Nenhuma carona encontrada a partir de '
-                '${formatDate(_date.toIso8601String().split('T').first)}.\n'
-                'Tente outro dia, horário ou destino.',
-          ),
-          if (_hasExtraFilters)
-            Center(
-              child: TextButton.icon(
-                onPressed: _clearFilters,
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('Limpar filtros'),
+      return [
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              EmptyState(
+                icon: Icons.no_transfer_rounded,
+                message:
+                    'Nenhuma carona encontrada a partir de '
+                    '${formatDate(_date.toIso8601String().split('T').first)}.\n'
+                    'Tente outro dia, horário ou destino.',
               ),
-            ),
-        ],
-      );
+              if (_hasExtraFilters)
+                TextButton.icon(
+                  onPressed: _clearFilters,
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('Limpar filtros'),
+                ),
+            ],
+          ),
+        ),
+      ];
     }
-    return ListView.separated(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      itemCount: _rides.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final ride = _rides[index];
-        return RideCard(
-          ride: ride,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RideDetailScreen(rideId: ride.id),
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Text(
+            _rides.length == 1
+                ? '1 carona disponível'
+                : '${_rides.length} caronas disponíveis',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        sliver: SliverList.separated(
+          itemCount: _rides.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final ride = _rides[index];
+            return RideCard(
+              ride: ride,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RideDetailScreen(rideId: ride.id),
+                ),
               ),
             );
           },
-        );
-      },
-    );
+        ),
+      ),
+    ];
   }
 }
 
