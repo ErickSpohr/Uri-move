@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../core/theme.dart';
+import 'map_tiles.dart';
 
 class LocationMap extends StatefulWidget {
   const LocationMap({super.key});
@@ -18,9 +18,6 @@ class LocationMap extends StatefulWidget {
 
 class _LocationMapState extends State<LocationMap> {
   static const _fallbackCenter = LatLng(-28.3007, -54.2669);
-  static final _openStreetMapCopyright = Uri.parse(
-    'https://www.openstreetmap.org/copyright',
-  );
 
   final _mapController = MapController();
 
@@ -146,12 +143,7 @@ class _LocationMapState extends State<LocationMap> {
                   maxZoom: 19,
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'br.urimove.uri_move_app',
-                    maxZoom: 19,
-                  ),
+                  AppMapTiles.layer(context),
                   if (currentPoint != null) ...[
                     CircleLayer(
                       circles: [
@@ -176,14 +168,7 @@ class _LocationMapState extends State<LocationMap> {
                       ],
                     ),
                   ],
-                  RichAttributionWidget(
-                    attributions: [
-                      TextSourceAttribution(
-                        'OpenStreetMap contributors',
-                        onTap: () => launchUrl(_openStreetMapCopyright),
-                      ),
-                    ],
-                  ),
+                  AppMapTiles.attribution(),
                 ],
               ),
               Positioned(
