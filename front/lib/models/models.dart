@@ -174,6 +174,8 @@ class Ride {
     this.driverPixKey,
     this.originLat,
     this.originLng,
+    this.destinationLat,
+    this.destinationLng,
   });
 
   final int id;
@@ -206,6 +208,8 @@ class Ride {
   /// Coordenadas da origem, quando escolhida pelo autocompletar de endereço.
   final double? originLat;
   final double? originLng;
+  final double? destinationLat;
+  final double? destinationLng;
 
   bool get isActive => status == 'active';
   bool get isCompleted => status == 'completed';
@@ -241,6 +245,8 @@ class Ride {
     driverPixKey: json['driver_pix_key'] as String?,
     originLat: (json['origin_lat'] as num?)?.toDouble(),
     originLng: (json['origin_lng'] as num?)?.toDouble(),
+    destinationLat: (json['destination_lat'] as num?)?.toDouble(),
+    destinationLng: (json['destination_lng'] as num?)?.toDouble(),
   );
 }
 

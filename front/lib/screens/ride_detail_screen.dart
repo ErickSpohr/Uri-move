@@ -14,6 +14,7 @@ import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/map_tiles.dart';
+import '../widgets/ride_route_map.dart';
 import '../widgets/user_safety.dart';
 import 'pickup_picker_screen.dart';
 import 'rate_ride_screen.dart';
@@ -127,7 +128,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         return;
       }
       // Iniciar/concluir/cancelar liga ou desliga o envio automático da posição,
-      // e as abas (Minhas caronas, Explorar) recarregam.
+      // e as abas (Caronas, Explorar) recarregam.
       final auth = context.read<AuthController>();
       unawaited(auth.locationSharer.sync());
       auth.notifyDataChanged();
@@ -387,6 +388,8 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 14),
+          RideRouteMap(ride: ride),
           const SizedBox(height: 14),
           _DriverCard(ride: ride, showSafetyMenu: !_isDriver),
           const SizedBox(height: 14),

@@ -40,7 +40,7 @@ class _MyRidesScreenState extends State<MyRidesScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Minhas caronas'),
+        title: const Text('Caronas'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

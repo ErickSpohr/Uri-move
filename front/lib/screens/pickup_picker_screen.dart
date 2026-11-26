@@ -16,9 +16,18 @@ class PickupPoint {
 
 /// O passageiro arrasta o mapa até o alfinete central ficar sobre o local de embarque.
 class PickupPickerScreen extends StatefulWidget {
-  const PickupPickerScreen({super.key, this.initial});
+  const PickupPickerScreen({
+    super.key,
+    this.initial,
+    this.title = 'Ponto de encontro',
+    this.askLabel = true,
+  });
 
   final PickupPoint? initial;
+  final String title;
+
+  /// Exibe o campo de referência (ex.: "em frente à padaria").
+  final bool askLabel;
 
   @override
   State<PickupPickerScreen> createState() => _PickupPickerScreenState();
@@ -92,7 +101,7 @@ class _PickupPickerScreenState extends State<PickupPickerScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Ponto de encontro')),
+      appBar: AppBar(title: Text(widget.title)),
       body: Column(
         children: [
           Expanded(
@@ -145,7 +154,7 @@ class _PickupPickerScreenState extends State<PickupPickerScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Arraste o mapa até o alfinete ficar no local de embarque.',
+                    'Arraste o mapa até o alfinete ficar sobre o local.',
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
                   if (_error != null) ...[
@@ -153,6 +162,7 @@ class _PickupPickerScreenState extends State<PickupPickerScreen> {
                     Text(_error!, style: TextStyle(color: scheme.error)),
                   ],
                   const SizedBox(height: 10),
+                  if (widget.askLabel)
                   TextField(
                     controller: _labelController,
                     maxLength: 191,
