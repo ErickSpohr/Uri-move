@@ -9,7 +9,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../core/api.dart';
 import '../services/api_repository.dart';
+import '../services/ride_location_sharer.dart';
 import '../services/route_service.dart';
 import '../state/auth_controller.dart';
 import '../widgets/map_tiles.dart';
@@ -75,7 +77,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
   double _heading = 0;
 
   Timer? _refreshTimer;
-  Timer? _shareTimer;
   LatLng? _me;
   LatLng? _destination;
   List<TrackingStop> _stops = const [];
@@ -89,10 +90,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
 
   bool _mapReady = false;
   bool _follow = true;
-  bool _sharing = false;
   bool _fetching = false;
-  bool _sending = false;
   bool _locating = false;
+
+  /// Carona concluída ou cancelada enquanto a tela estava aberta.
+  bool _ended = false;
   String? _error;
 
   @override
@@ -102,6 +104,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
     _api = auth.api;
     _myId = auth.user?.id;
     _isDriver = widget.ride.driver.id == _myId;
+    if (_isDriver) {
+      // Garante o envio automático mesmo se a tela for aberta direto.
+      unawaited(auth.locationSharer.sync());
+    }
     // Duração próxima do intervalo de envio do motorista (10 s): o carro anda
     // continuamente em vez de saltar entre leituras.
     _carAnimation = AnimationController(
@@ -118,9 +124,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) {
-      _stopSharing();
-    } else {
+    if (state == AppLifecycleState.resumed) {
       _refresh();
     }
   }
@@ -129,11 +133,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
-    _shareTimer?.cancel();
     _carAnimation.dispose();
-    if (_sharing) {
-      unawaited(_api.stopRideLocation(widget.ride.id).catchError((_) {}));
-    }
     _mapController.dispose();
     super.dispose();
   }
@@ -218,6 +218,20 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
         if (focus != null) _mapController.move(focus, 13);
       }
       unawaited(_updateRoute());
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // 422: o rastreamento só existe com a carona em andamento.
+      if (e.statusCode == 422 || e.statusCode == 403) {
+        _refreshTimer?.cancel();
+        setState(() {
+          _ended = true;
+          _moveCarTo(null);
+          _route = null;
+          _error = null;
+        });
+      } else {
+        setState(() => _error = 'Não foi possível atualizar a posição.');
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'Não foi possível atualizar a posição.');
@@ -312,69 +326,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
         timeLimit: const Duration(seconds: 20),
       ),
     ).timeout(const Duration(seconds: 25));
-  }
-
-  Future<void> _startSharing() async {
-    if (_sharing) return;
-    setState(() {
-      _sharing = true;
-      _error = null;
-    });
-    await _sendPosition();
-    if (_sharing && mounted) {
-      _shareTimer = Timer.periodic(
-        const Duration(seconds: 10),
-        (_) => _sendPosition(),
-      );
-    }
-  }
-
-  Future<void> _sendPosition() async {
-    if (_sending || !_sharing) return;
-    _sending = true;
-    try {
-      final position = await _position();
-      if (!_sharing) return;
-      await _api.updateRideLocation(
-        widget.ride.id,
-        position.latitude,
-        position.longitude,
-        position.accuracy.round().clamp(0, 10000),
-      );
-      await _refresh();
-    } catch (error) {
-      _shareTimer?.cancel();
-      _sharing = false;
-      if (mounted) {
-        setState(
-          () => _error = error is StateError
-              ? error.message
-              : 'Não foi possível compartilhar a localização.',
-        );
-      }
-    } finally {
-      _sending = false;
-    }
-  }
-
-  Future<void> _stopSharing() async {
-    if (!_sharing) return;
-    _sharing = false;
-    _shareTimer?.cancel();
-    if (mounted) setState(() {});
-    try {
-      while (_sending) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
-      await _api.stopRideLocation(widget.ride.id);
-      await _refresh();
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => _error = 'Não foi possível interromper o compartilhamento.',
-        );
-      }
-    }
   }
 
   Future<void> _locateMe() async {
@@ -592,10 +543,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    _carTo == null
+                    _ended
+                        ? 'A carona foi encerrada ou cancelada.'
+                        : _carTo == null
                         ? (_isDriver
-                              ? 'Toque em compartilhar para os passageiros verem o carro.'
-                              : 'Aguardando o motorista compartilhar a localização.')
+                              ? 'Obtendo sua localização...'
+                              : 'Aguardando a localização do motorista.')
                         : 'Carro localizado${_updatedAt == null ? '' : ' · atualizado às ${TimeOfDay.fromDateTime(_updatedAt!.toLocal()).format(context)}'}',
                   ),
                   if (target != null && _eta(target.position) != null)
@@ -624,16 +577,8 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
                     ),
                   const SizedBox(height: 10),
                   if (_isDriver)
-                    FilledButton.icon(
-                      onPressed: _sharing ? _stopSharing : _startSharing,
-                      icon: Icon(
-                        _sharing ? Icons.location_off : Icons.location_on,
-                      ),
-                      label: Text(
-                        _sharing
-                            ? 'Parar de compartilhar'
-                            : 'Compartilhar minha localização',
-                      ),
+                    _DriverSharingStatus(
+                      sharer: context.read<AuthController>().locationSharer,
                     )
                   else if (!_stops.any((s) => s.passengerId == _myId))
                     OutlinedButton.icon(
@@ -641,21 +586,51 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
                       icon: const Icon(Icons.my_location),
                       label: const Text('Mostrar minha posição e tempo até mim'),
                     ),
-                  if (_isDriver && _sharing)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        'Mantenha o app aberto e a tela ligada durante o trajeto.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                      ),
-                    ),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Situação do envio automático da posição, mostrada ao motorista.
+class _DriverSharingStatus extends StatelessWidget {
+  const _DriverSharingStatus({required this.sharer});
+
+  final RideLocationSharer sharer;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: sharer,
+      builder: (context, _) {
+        final scheme = Theme.of(context).colorScheme;
+        final error = sharer.error;
+        if (error != null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(error, style: TextStyle(color: scheme.error)),
+              if (sharer.rideId != null)
+                TextButton.icon(
+                  onPressed: () => sharer.start(sharer.rideId!),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Tentar de novo'),
+                ),
+            ],
+          );
+        }
+        return Text(
+          sharer.isSharing
+              ? 'Sua localização é compartilhada automaticamente enquanto a '
+                    'carona estiver em andamento. Mantenha o app aberto.'
+              : 'O compartilhamento começa quando a carona é iniciada.',
+          style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+        );
+      },
     );
   }
 }

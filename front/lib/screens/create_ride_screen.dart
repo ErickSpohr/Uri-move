@@ -54,14 +54,20 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   bool _loading = true;
   bool _submitting = false;
 
+  late final AuthController _auth;
+
   @override
   void initState() {
     super.initState();
+    _auth = context.read<AuthController>();
+    // Veículos cadastrados no Perfil aparecem aqui sem reabrir o app.
+    _auth.dataVersion.addListener(_loadVehicles);
     _loadVehicles();
   }
 
   @override
   void dispose() {
+    _auth.dataVersion.removeListener(_loadVehicles);
     _originController.dispose();
     _destinationController.dispose();
     _priceController.dispose();
@@ -78,8 +84,16 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       }
       setState(() {
         _vehicles = vehicles.where((v) => v.isActive).toList();
-        if (_vehicles.isNotEmpty) {
-          _vehicle = _vehicles.first;
+        // Mantém a escolha atual (por id: a lista traz instâncias novas).
+        final selectedId = _vehicle?.id;
+        _vehicle = _vehicles.isEmpty
+            ? null
+            : _vehicles.firstWhere(
+                (v) => v.id == selectedId,
+                orElse: () => _vehicles.first,
+              );
+        if (_vehicle != null && _seats > _vehicle!.seats) {
+          _seats = _vehicle!.seats;
         }
         _loading = false;
       });
@@ -164,6 +178,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         _vehicles.add(created);
         _vehicle = created;
       });
+      _auth.notifyDataChanged();
     }
   }
 
@@ -311,6 +326,10 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                       )
                     else ...[
                       DropdownButtonFormField<Vehicle>(
+                        // Recria o campo quando a lista muda (initialValue só vale na criação).
+                        key: ValueKey(
+                          '${_vehicles.map((v) => v.id).join(',')}:${_vehicle?.id}',
+                        ),
                         initialValue: _vehicle,
                         decoration: const InputDecoration(
                           labelText: 'Veículo',

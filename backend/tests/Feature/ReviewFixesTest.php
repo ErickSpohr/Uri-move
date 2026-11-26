@@ -176,6 +176,6 @@ class ReviewFixesTest extends TestCase
 
         Sanctum::actingAs($passenger);
         $this->getJson('/api/v1/rides')->assertOk()->assertJsonCount(0, 'data');
-        $this->postJson("/api/v1/rides/{$ride->id}/requests")->assertForbidden();
+        $this->postJson("/api/v1/rides/{$ride->id}/requests", ['pickup_lat' => -28.15, 'pickup_lng' => -54.74])->assertForbidden();
     }
 }

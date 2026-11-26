@@ -101,11 +101,11 @@ class RideFeaturesTest extends TestCase
 
         Sanctum::actingAs($man);
         $this->getJson('/api/v1/rides')->assertOk()->assertJsonCount(0, 'data');
-        $this->postJson("/api/v1/rides/{$rideId}/requests")->assertForbidden();
+        $this->postJson("/api/v1/rides/{$rideId}/requests", ['pickup_lat' => -28.15, 'pickup_lng' => -54.74])->assertForbidden();
 
         Sanctum::actingAs(User::factory()->create(['gender' => 'woman']));
         $this->getJson('/api/v1/rides?women_only=1')->assertOk()->assertJsonCount(1, 'data');
-        $this->postJson("/api/v1/rides/{$rideId}/requests")->assertCreated();
+        $this->postJson("/api/v1/rides/{$rideId}/requests", ['pickup_lat' => -28.15, 'pickup_lng' => -54.74])->assertCreated();
     }
 
     public function test_driver_pix_key_visible_only_to_confirmed_passengers(): void

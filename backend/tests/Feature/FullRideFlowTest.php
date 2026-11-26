@@ -79,7 +79,7 @@ class FullRideFlowTest extends TestCase
         $this->assertArrayNotHasKey('email', $found['driver']);
 
         // Solicita vaga e conversa em privado antes do aceite.
-        $requestId = $this->as($passengerToken)->postJson("/api/v1/rides/{$rideId}/requests", ['seats_requested' => 1])
+        $requestId = $this->as($passengerToken)->postJson("/api/v1/rides/{$rideId}/requests", ['seats_requested' => 1, 'pickup_lat' => -28.15, 'pickup_lng' => -54.74])
             ->assertCreated()->json('request.id');
         $this->as($passengerToken)->postJson("/api/v1/rides/{$rideId}/messages", ['body' => 'Posso levar mochila?'])
             ->assertCreated();
