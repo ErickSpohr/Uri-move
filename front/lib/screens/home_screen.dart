@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/loading_indicator.dart';
 import '../core/api.dart';
 import '../core/theme.dart';
 import '../core/formats.dart';
@@ -325,12 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final scheme = Theme.of(context).colorScheme;
     if (_loading) {
       return const [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        ),
+        SliverToBoxAdapter(child: Center(child: LoadingIndicator())),
       ];
     }
     if (_error != null) {

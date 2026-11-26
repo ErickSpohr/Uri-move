@@ -10,6 +10,7 @@ import '../widgets/common.dart';
 import '../widgets/vehicle_dialog.dart';
 import 'admin_reports_screen.dart';
 import 'blocked_users_screen.dart';
+import 'how_it_works_screen.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -289,6 +290,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.help_outline),
+                      title: const Text('Como funciona'),
+                      subtitle: const Text('Passo a passo de cada parte do app'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const HowItWorksScreen(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Card(
                     child: ListTile(
                       leading: const Icon(Icons.block),

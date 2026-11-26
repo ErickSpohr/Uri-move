@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRideRequest;
+use App\Http\Requests\UpdateRideRequest;
 use App\Http\Resources\RideResource;
 use App\Models\Block;
 use App\Models\Ride;
@@ -270,6 +271,65 @@ class RideController extends Controller
     /**
      * Cancela a carona, encerra solicitações e participações e avisa os passageiros afetados.
      */
+    /**
+     * Edita data, horário, vagas e observações enquanto nenhum passageiro foi aceito.
+     * No rateio, a parte fixa e os valores sugeridos dos pedidos pendentes são recalculados.
+     */
+    public function update(UpdateRideRequest $request, Ride $ride): JsonResponse
+    {
+        $this->authorizeRideDriver($request, $ride);
+        abort_if($ride->status !== Ride::STATUS_SCHEDULED, 422, 'Só é possível editar caronas que ainda não começaram.');
+        abort_if(
+            $ride->passengers()->where('status', RidePassenger::STATUS_CONFIRMED)->exists(),
+            422,
+            'Não é possível editar depois de aceitar um passageiro. Cancele e publique de novo se precisar mudar.',
+        );
+
+        $data = $request->validated();
+        if (isset($data['total_seats'])) {
+            $data['available_seats'] = $data['total_seats'];
+            if ($ride->cost_sharing && $ride->route_km) {
+                $data['price'] = RidePricing::baseShare((float) $ride->route_km, (float) $ride->cost_per_km, $data['total_seats']);
+            }
+        }
+
+        $pending = DB::transaction(function () use ($ride, $data) {
+            $ride->update($data);
+            $pending = $ride->requests()->with('passenger')->where('status', RideRequest::STATUS_PENDING)->get();
+
+            // Valor sugerido = nova parte fixa + custo do desvio já calculado.
+            if ($ride->cost_sharing && isset($data['price'])) {
+                foreach ($pending as $request) {
+                    $request->update([
+                        'suggested_price' => RidePricing::roundUpToHalf(
+                            (float) $ride->price + (float) $request->detour_km * (float) $ride->cost_per_km,
+                        ),
+                    ]);
+                }
+            }
+
+            return $pending;
+        });
+
+        foreach ($pending as $rideRequest) {
+            if ($rideRequest->passenger) {
+                $this->notifications->send(
+                    $rideRequest->passenger,
+                    'ride_updated',
+                    'Carona alterada',
+                    "{$request->user()->name} alterou a carona que você pediu. Confira os detalhes.",
+                    $request->user(),
+                    ['ride_id' => $ride->id],
+                );
+            }
+        }
+
+        return response()->json([
+            'message' => 'Carona atualizada.',
+            'ride' => new RideResource($ride->refresh()->load(['driver', 'vehicle'])),
+        ]);
+    }
+
     private function cancelSingle(Request $request, Ride $ride): void
     {
         $affectedPassengers = DB::transaction(function () use ($ride) {

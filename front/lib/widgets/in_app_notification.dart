@@ -20,6 +20,7 @@ class InAppNotification {
     'driver_near' => Icons.directions_car_rounded,
     'driver_arrived' => Icons.place_rounded,
     'rating_received' => Icons.star_rounded,
+    'ride_updated' => Icons.edit_calendar_rounded,
     _ => Icons.notifications_rounded,
   };
 

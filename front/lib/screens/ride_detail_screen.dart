@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../widgets/loading_indicator.dart';
 import '../core/api.dart';
 import '../core/formats.dart';
 import '../core/theme.dart';
@@ -16,6 +17,7 @@ import '../widgets/common.dart';
 import '../widgets/map_tiles.dart';
 import '../widgets/ride_route_map.dart';
 import '../widgets/user_safety.dart';
+import 'edit_ride_screen.dart';
 import 'pickup_picker_screen.dart';
 import 'rate_ride_screen.dart';
 import 'user_profile_screen.dart';
@@ -210,6 +212,28 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
   /// Aceite com rateio: o motorista confirma o valor sugerido ou dá desconto.
   Future<void> _respond(Ride ride, RideRequest request, String action) async {
+    if (action == 'rejected') {
+      final name = request.passenger?.name.split(' ').first ?? 'o passageiro';
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Recusar pedido?'),
+          content: Text('$name será avisado(a) de que o pedido foi recusado.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Voltar'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Recusar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
     double? price;
     final suggested = request.suggestedPrice;
     if (action == 'accepted' && suggested != null && suggested > 0) {
@@ -289,7 +313,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Detalhes da carona')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: LoadingIndicator())
           : _error != null || _ride == null
           ? Center(child: Text(_error ?? 'Carona não encontrada.'))
           : _buildBody(context),
@@ -603,6 +627,20 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (ride.status == 'scheduled') ...[
+            // Edição só enquanto ninguém foi aceito (vagas ocupadas = 0).
+            if (ride.occupiedSeats == 0) ...[
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final updated = await Navigator.of(context).push<Ride>(
+                    MaterialPageRoute(builder: (_) => EditRideScreen(ride: ride)),
+                  );
+                  if (updated != null && mounted) _load();
+                },
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar carona'),
+              ),
+              const SizedBox(height: 10),
+            ],
             PrimaryButton(
               label: 'Iniciar carona',
               loading: _busy,

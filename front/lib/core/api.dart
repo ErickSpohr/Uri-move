@@ -43,6 +43,11 @@ class ApiClient {
 
   static const Set<int> _retryableStatus = {502, 503, 504};
 
+  /// Frase exibida quando o servidor gratuito está "acordando" (resposta lenta,
+  /// tempo esgotado ou 502/503/504).
+  static const String serverStartingMessage =
+      'O servidor está iniciando, aguarde alguns segundos.';
+
   final String baseUrl;
   final http.Client _client;
   String? _token;
@@ -167,7 +172,7 @@ class ApiClient {
         } on TimeoutException {
           throw ApiException(
             ApiException.noResponse,
-            'O servidor demorou para responder. Verifique sua conexão e tente novamente.',
+            '$serverStartingMessage Depois, tente novamente.',
           );
         } on http.ClientException {
           if (canRetry) {
@@ -194,6 +199,14 @@ class ApiClient {
       decoded = jsonDecode(utf8.decode(response.bodyBytes));
     } catch (_) {
       decoded = null;
+    }
+
+    if (_retryableStatus.contains(response.statusCode)) {
+      throw ApiException(
+        response.statusCode,
+        '$serverStartingMessage Depois, tente novamente.',
+        decoded,
+      );
     }
 
     if (response.statusCode >= 400) {
