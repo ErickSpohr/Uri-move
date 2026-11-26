@@ -17,6 +17,7 @@ class VehicleResource extends JsonResource
             'plate' => $this->plate,
             'year' => $this->year,
             'seats' => $this->seats,
+            'fuel_consumption' => $this->fuel_consumption !== null ? (float) $this->fuel_consumption : null,
             'is_active' => $this->is_active,
         ];
     }

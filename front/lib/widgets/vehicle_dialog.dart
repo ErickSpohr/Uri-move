@@ -19,6 +19,7 @@ class VehicleDialogState extends State<VehicleDialog> {
   final _modelController = TextEditingController();
   final _colorController = TextEditingController();
   final _plateController = TextEditingController();
+  final _consumptionController = TextEditingController();
   int _seats = 4;
   bool _saving = false;
 
@@ -36,6 +37,8 @@ class VehicleDialogState extends State<VehicleDialog> {
     _colorController.text = vehicle.color ?? '';
     _plateController.text = vehicle.plate ?? '';
     _seats = vehicle.seats;
+    _consumptionController.text =
+        vehicle.fuelConsumption?.toStringAsFixed(1).replaceAll('.', ',') ?? '';
   }
 
   @override
@@ -44,6 +47,7 @@ class VehicleDialogState extends State<VehicleDialog> {
     _modelController.dispose();
     _colorController.dispose();
     _plateController.dispose();
+    _consumptionController.dispose();
     super.dispose();
   }
 
@@ -65,6 +69,9 @@ class VehicleDialogState extends State<VehicleDialog> {
           ? null
           : _colorController.text.trim();
       final plate = _plateController.text.trim().toUpperCase();
+      final consumption = double.tryParse(
+        _consumptionController.text.trim().replaceAll(',', '.'),
+      );
       final vehicle = _isEditing
           ? await api.updateVehicle(
               id: widget.vehicle!.id,
@@ -74,6 +81,7 @@ class VehicleDialogState extends State<VehicleDialog> {
               plate: plate,
               year: widget.vehicle!.year,
               seats: _seats,
+              fuelConsumption: consumption,
             )
           : await api.createVehicle(
               brand: brand,
@@ -81,6 +89,7 @@ class VehicleDialogState extends State<VehicleDialog> {
               color: color,
               plate: plate,
               seats: _seats,
+              fuelConsumption: consumption,
             );
       if (!mounted) {
         return;
@@ -139,6 +148,17 @@ class VehicleDialogState extends State<VehicleDialog> {
               decoration: const InputDecoration(
                 labelText: 'Placa (ex.: ABC1D23)',
                 hintText: 'ABC1D23',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _consumptionController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Consumo médio (km/L)',
+                hintText: 'Ex.: 12',
+                helperText: 'Usado para calcular o rateio. Em branco: 10 km/L.',
+                helperMaxLines: 2,
               ),
             ),
             const SizedBox(height: 12),

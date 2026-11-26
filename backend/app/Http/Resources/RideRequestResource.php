@@ -20,6 +20,10 @@ class RideRequestResource extends JsonResource
             'pickup_lat' => $this->pickup_lat,
             'pickup_lng' => $this->pickup_lng,
             'pickup_label' => $this->pickup_label,
+            'detour_km' => $this->detour_km,
+            'detour_minutes' => $this->detour_minutes,
+            'suggested_price' => $this->suggested_price,
+            'agreed_price' => $this->agreed_price,
             'responded_at' => $this->responded_at,
             'created_at' => $this->created_at,
         ];

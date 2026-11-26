@@ -74,6 +74,9 @@ void main() {
       find.widgetWithText(TextField, 'Modelo (ex.: Argo)'),
       'Gol Special',
     );
+    // O campo de consumo empurrou o seletor de lugares para baixo no diálogo.
+    await tester.ensureVisible(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.add));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
@@ -87,6 +90,7 @@ void main() {
       'plate': 'ABC1D23',
       'year': 2015,
       'seats': 5,
+      'fuel_consumption': null,
     });
     expect(find.text('Editar veículo'), findsNothing);
   });

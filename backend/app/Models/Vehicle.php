@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['user_id', 'brand', 'model', 'color', 'plate', 'year', 'seats', 'is_active'])]
+#[Fillable(['user_id', 'brand', 'model', 'color', 'plate', 'year', 'seats', 'is_active', 'fuel_consumption'])]
 class Vehicle extends Model
 {
     use HasFactory;

@@ -73,13 +73,26 @@ class RideCard extends StatelessWidget {
                     ),
                   ),
                   // Preço nulo = gratuita (formatPrice exibe "Grátis").
-                  Text(
-                    formatPrice(ride.price),
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (ride.costSharing && ride.price != null)
+                        Text(
+                          'a partir de',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      Text(
+                        formatPrice(ride.myPrice ?? ride.price),
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

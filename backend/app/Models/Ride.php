@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'destination', 'destination_lat', 'destination_lng',
     'departure_date', 'departure_time', 'total_seats', 'available_seats',
     'price', 'status', 'notes', 'is_recurring', 'series_id', 'women_only',
+    'cost_sharing', 'route_km', 'cost_per_km',
 ])]
 class Ride extends Model
 {
@@ -42,6 +43,9 @@ class Ride extends Model
             'price' => 'decimal:2',
             'is_recurring' => 'boolean',
             'women_only' => 'boolean',
+            'cost_sharing' => 'boolean',
+            'route_km' => 'float',
+            'cost_per_km' => 'float',
             'origin_lat' => 'decimal:8',
             'origin_lng' => 'decimal:8',
             'destination_lat' => 'decimal:8',

@@ -37,6 +37,12 @@ class RideResource extends JsonResource
             'is_recurring' => $this->is_recurring,
             'my_request_status' => $authUser ? $this->viewerRequest($authUser)?->status : null,
             'my_request_id' => $authUser ? $this->viewerRequest($authUser)?->id : null,
+            // Valor do passageiro: combinado no aceite ou, antes disso, o sugerido.
+            'my_price' => $authUser
+                ? ($this->viewerRequest($authUser)?->agreed_price ?? $this->viewerRequest($authUser)?->suggested_price)
+                : null,
+            'cost_sharing' => (bool) $this->cost_sharing,
+            'route_km' => $this->route_km,
             'series_id' => $this->series_id,
             'women_only' => (bool) $this->women_only,
             // Chave Pix do motorista só para quem tem vaga confirmada (ou o próprio motorista).

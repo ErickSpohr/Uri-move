@@ -193,12 +193,14 @@ class ApiRepository {
     required int totalSeats,
     double? price,
     String? notes,
+    bool costSharing = false,
     bool womenOnly = false,
     List<int> repeatDays = const [],
     String? repeatUntil,
   }) async {
     final body = <String, dynamic>{
       'women_only': womenOnly,
+      'cost_sharing': costSharing,
       if (repeatDays.isNotEmpty) 'repeat_days': repeatDays,
       if (repeatDays.isNotEmpty) 'repeat_until': repeatUntil,
       if (vehicleId != null) 'vehicle_id': int.tryParse(vehicleId),
@@ -337,11 +339,25 @@ class ApiRepository {
     await client.delete('/rides/$rideId/requests/$requestId');
   }
 
-  Future<void> respondRequest(int rideId, int requestId, String action) async {
+  /// [price]: valor combinado no aceite (rateio), até o sugerido.
+  Future<void> respondRequest(
+    int rideId,
+    int requestId,
+    String action, {
+    double? price,
+  }) async {
     await client.patch(
       '/rides/$rideId/requests/$requestId',
-      body: {'action': action},
+      body: {'action': action, if (price != null) 'price': price},
     );
+  }
+
+  Future<PriceQuote> rideQuote(int rideId, double lat, double lng) async {
+    final json = await client.get(
+      '/rides/$rideId/quote',
+      query: {'pickup_lat': '$lat', 'pickup_lng': '$lng'},
+    );
+    return PriceQuote.fromJson(dataMap(json));
   }
 
   // ------------------------------------------------------------- Veículos
@@ -359,6 +375,7 @@ class ApiRepository {
     required String plate,
     String? year,
     int seats = 4,
+    double? fuelConsumption,
   }) async {
     final json = await client.post(
       '/vehicles',
@@ -369,6 +386,7 @@ class ApiRepository {
         'plate': plate,
         if (year != null && year.isNotEmpty) 'year': int.tryParse(year),
         'seats': seats,
+        'fuel_consumption': fuelConsumption,
       },
     );
     return Vehicle.fromJson(dataMap(json)['vehicle'] as Map<String, dynamic>);
@@ -382,6 +400,7 @@ class ApiRepository {
     required String plate,
     int? year,
     int seats = 4,
+    double? fuelConsumption,
   }) async {
     final json = await client.put(
       '/vehicles/$id',
@@ -392,6 +411,7 @@ class ApiRepository {
         'plate': plate,
         'year': year,
         'seats': seats,
+        'fuel_consumption': fuelConsumption,
       },
     );
     return Vehicle.fromJson(dataMap(json)['vehicle'] as Map<String, dynamic>);

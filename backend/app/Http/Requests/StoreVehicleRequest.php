@@ -20,6 +20,7 @@ class StoreVehicleRequest extends FormRequest
             'plate' => ['required', 'string', 'max:10', 'unique:vehicles,plate'],
             'year' => ['nullable', 'integer', 'between:1900,'.(date('Y') + 1)],
             'seats' => ['nullable', 'integer', 'between:1,20'],
+            'fuel_consumption' => ['nullable', 'numeric', 'between:3,40'],
         ];
     }
 }
