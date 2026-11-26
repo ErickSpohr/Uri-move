@@ -60,6 +60,7 @@ Route::prefix('v1')->group(function () {
         // Caronas
         Route::post('/rides', [RideController::class, 'store']);
         Route::get('/rides/{ride}', [RideController::class, 'show']);
+        Route::put('/rides/{ride}', [RideController::class, 'update']);
         Route::post('/rides/{ride}/start', [RideController::class, 'start']);
         Route::post('/rides/{ride}/complete', [RideController::class, 'complete']);
         Route::post('/rides/{ride}/cancel', [RideController::class, 'cancel']);

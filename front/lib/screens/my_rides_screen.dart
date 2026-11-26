@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/loading_indicator.dart';
 import '../core/api.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
@@ -126,7 +127,7 @@ class _RideListBaseState extends State<_RideListBase> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: LoadingIndicator());
     }
     if (_error != null) {
       return Center(child: Text(_error!));

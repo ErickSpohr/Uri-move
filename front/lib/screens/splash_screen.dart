@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/loading_indicator.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
 import 'login_screen.dart';
 import 'main_shell.dart';
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,6 +30,21 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) {
       return;
     }
+    // Primeiro acesso no aparelho (sem login salvo): apresentação antes do login.
+    if (!auth.isAuthenticated && !await OnboardingScreen.wasSeen()) {
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (onboardingContext) => OnboardingScreen(
+            onDone: () => Navigator.of(onboardingContext).pushReplacement(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
     final target = auth.isAuthenticated
         ? const MainShell()
         : const LoginScreen();
@@ -51,11 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 28),
-            const SizedBox(
-              width: 26,
-              height: 26,
-              child: CircularProgressIndicator(strokeWidth: 2.6),
-            ),
+            const LoadingIndicator(padding: EdgeInsets.symmetric(horizontal: 32)),
           ],
         ),
       ),

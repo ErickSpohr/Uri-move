@@ -231,6 +231,26 @@ class ApiRepository {
     );
   }
 
+  /// Edita carona sem passageiros aceitos (data, horário, vagas, observações).
+  Future<Ride> updateRide(
+    int id, {
+    required String departureDate,
+    required String departureTime,
+    required int totalSeats,
+    String? notes,
+  }) async {
+    final json = await client.put(
+      '/rides/$id',
+      body: {
+        'departure_date': departureDate,
+        'departure_time': departureTime,
+        'total_seats': totalSeats,
+        'notes': notes,
+      },
+    );
+    return Ride.fromJson(dataMap(json)['ride'] as Map<String, dynamic>);
+  }
+
   Future<Ride> startRide(int id) async {
     final json = await client.post('/rides/$id/start');
     return Ride.fromJson(dataMap(json)['ride'] as Map<String, dynamic>);
