@@ -27,6 +27,17 @@ class StoreRideRequest extends FormRequest
             'price' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'is_recurring' => ['nullable', 'boolean'],
+            'women_only' => ['nullable', 'boolean'],
+            // Repetição semanal: dias ISO (1 = segunda … 7 = domingo) até repeat_until (máx. 60 dias).
+            'repeat_days' => ['nullable', 'array', 'min:1', 'max:7'],
+            'repeat_days.*' => ['integer', 'between:1,7', 'distinct'],
+            'repeat_until' => [
+                'required_with:repeat_days',
+                'nullable',
+                'date_format:Y-m-d',
+                'after_or_equal:departure_date',
+                'before_or_equal:'.now()->addDays(60)->toDateString(),
+            ],
         ];
     }
 

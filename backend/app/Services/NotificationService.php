@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Report;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Services\WebPush\WebPushSender;
+
+use function Illuminate\Support\defer;
 
 class NotificationService
 {
@@ -16,13 +19,24 @@ class NotificationService
         ?User $actor = null,
         array $payload = [],
     ): UserNotification {
-        return $user->notifications()->create([
+        $notification = $user->notifications()->create([
             'actor_id' => $actor?->id,
             'type' => $type,
             'title' => $title,
             'body' => $body,
             'payload' => $payload,
         ]);
+
+        // Push para navegadores inscritos, executado após o envio da resposta HTTP.
+        defer(fn () => app(WebPushSender::class)->sendToUser($user, [
+            'title' => $title,
+            'body' => $body,
+            'type' => $type,
+            'notification_id' => $notification->id,
+            'ride_id' => $payload['ride_id'] ?? null,
+        ]));
+
+        return $notification;
     }
 
     public function notifyRideRequestSubmitted(User $driver, User $passenger, array $payload = []): void

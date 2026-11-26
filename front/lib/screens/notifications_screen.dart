@@ -6,6 +6,8 @@ import '../core/theme.dart';
 import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/push_toggle.dart';
+import 'ride_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -88,7 +90,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             TextButton(onPressed: _markAll, child: const Text('Ler todas')),
         ],
       ),
-      body: _loading
+      body: Column(
+        children: [
+          const PushToggleTile(),
+          Expanded(child: _buildList()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList() {
+    return _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
           ? Center(child: Text(_error!))
@@ -107,24 +119,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final item = _items[index];
-                  return _NotificationCard(item: item);
+                  final rideId = item.payload?['ride_id'];
+                  return _NotificationCard(
+                    item: item,
+                    onTap: rideId is int
+                        ? () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => RideDetailScreen(rideId: rideId),
+                            ),
+                          )
+                        : null,
+                  );
                 },
               ),
-            ),
-    );
+            );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({required this.item});
+  const _NotificationCard({required this.item, this.onTap});
 
   final NotificationItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: EdgeInsets.zero,
-      child: Container(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
         decoration: item.isRead
             ? null
             : BoxDecoration(
@@ -171,7 +196,7 @@ class _NotificationCard extends StatelessWidget {
                       formatDate(item.createdAt),
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade500,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -179,16 +204,25 @@ class _NotificationCard extends StatelessWidget {
               ),
             ),
             if (!item.isRead)
-              Container(
-                width: 9,
-                height: 9,
-                decoration: const BoxDecoration(
-                  color: AppTheme.accent,
-                  shape: BoxShape.circle,
+              Semantics(
+                label: 'Não lida',
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.accent,
+                    shape: BoxShape.circle,
+                  ),
                 ),
+              ),
+            if (onTap != null)
+              Icon(
+                Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
           ],
         ),
+      ),
       ),
     );
   }

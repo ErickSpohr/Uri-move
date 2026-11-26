@@ -33,6 +33,7 @@ class UserResource extends JsonResource
             'email' => $this->when($canSeePrivate, $this->email),
             'phone' => $this->when($canSeePrivate, $this->phone),
             'gender' => $this->when($canSeePrivate, $this->gender),
+            'pix_key' => $this->when($canSeePrivate, $this->pix_key),
             'ra' => $this->when($canSeePrivate, $this->ra),
             'role' => $this->role,
             'photo_url' => $this->photo_url,

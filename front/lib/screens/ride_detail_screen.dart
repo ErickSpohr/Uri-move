@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/api.dart';
@@ -176,6 +177,59 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     );
   }
 
+  /// Carona de série: escolhe entre cancelar só esta ou esta e as próximas.
+  Future<void> _confirmSeriesCancel(Ride ride) async {
+    final wholeSeries = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancelar carona'),
+        content: const Text(
+          'Esta carona faz parte de uma série semanal. '
+          'Os passageiros confirmados serão avisados.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Voltar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Só esta'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Esta e as próximas'),
+          ),
+        ],
+      ),
+    );
+    if (wholeSeries == null || !mounted) {
+      return;
+    }
+    final api = context.read<AuthController>().api;
+    int? cancelled;
+    await _run(() async {
+      cancelled = (await api.cancelRide(
+        ride.id,
+        wholeSeries: wholeSeries,
+      )).cancelled;
+    });
+    // null: a requisição falhou e _run já exibiu o erro.
+    if (mounted && cancelled != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            cancelled! > 1
+                ? '$cancelled caronas canceladas.'
+                : 'Carona cancelada.',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -234,30 +288,30 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                           ],
                         ),
                       ),
-                      if (ride.price != null)
-                        Text(
-                          formatPrice(ride.price),
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.primary,
-                          ),
+                      // Usa a cor do tema para manter contraste no modo escuro.
+                      Text(
+                        formatPrice(ride.price),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
+                      ),
                     ],
                   ),
                   const Divider(height: 28),
-                  Row(
+                  Wrap(
+                    spacing: 20,
+                    runSpacing: 8,
                     children: [
                       _DetailItem(
                         icon: Icons.calendar_today_outlined,
                         label: formatDate(ride.departureDate),
                       ),
-                      const SizedBox(width: 20),
                       _DetailItem(
                         icon: Icons.schedule,
                         label: formatTime(ride.departureTime),
                       ),
-                      const SizedBox(width: 20),
                       _DetailItem(
                         icon: Icons.event_seat_outlined,
                         label:
@@ -275,13 +329,15 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                           color: Colors.grey,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          '${ride.vehicle!.label} · ${ride.vehicle!.plate} · ${ride.vehicle!.seats} lugares',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                        Expanded(
+                          child: Text(
+                            '${ride.vehicle!.label} · ${ride.vehicle!.plate} · ${ride.vehicle!.seats} lugares',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
@@ -305,6 +361,13 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
           const SizedBox(height: 14),
           _DriverCard(ride: ride, showSafetyMenu: !_isDriver),
           const SizedBox(height: 14),
+          if (ride.womenOnly)
+            const _InfoBanner(
+              icon: Icons.female,
+              text: 'Carona exclusiva para mulheres',
+            ),
+          if (!_isDriver && ride.driverPixKey != null)
+            _PixCard(pixKey: ride.driverPixKey!, price: ride.price),
           if (ride.isRecurring)
             Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -321,9 +384,11 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Carona recorrente (repete semanalmente)',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  Text(
+                    ride.seriesId != null
+                        ? 'Faz parte de uma série semanal'
+                        : 'Carona recorrente (repete semanalmente)',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -479,15 +544,19 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
             const SizedBox(height: 10),
             TextButton.icon(
               style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-              onPressed: () => _confirmAction(
-                title: 'Cancelar carona',
-                message: 'Tem certeza que deseja cancelar esta carona?',
-                confirmLabel: 'Cancelar carona',
-                color: Colors.redAccent,
-                action: () async =>
-                    context.read<AuthController>().api.cancelRide(ride.id),
-                success: 'Carona cancelada.',
-              ),
+              onPressed: () => ride.seriesId != null
+                  ? _confirmSeriesCancel(ride)
+                  : _confirmAction(
+                      title: 'Cancelar carona',
+                      message: 'Tem certeza que deseja cancelar esta carona?',
+                      confirmLabel: 'Cancelar carona',
+                      color: Colors.redAccent,
+                      action: () async => context
+                          .read<AuthController>()
+                          .api
+                          .cancelRide(ride.id),
+                      success: 'Carona cancelada.',
+                    ),
               icon: const Icon(Icons.cancel_outlined),
               label: const Text('Cancelar carona'),
             ),
@@ -611,8 +680,9 @@ class _DetailItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: AppTheme.primary),
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 5),
         Text(
           label,
@@ -841,6 +911,7 @@ class _RequestDialogState extends State<_RequestDialog> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton.outlined(
+                tooltip: 'Diminuir vagas',
                 onPressed: _seats > 1 ? () => setState(() => _seats--) : null,
                 icon: const Icon(Icons.remove),
               ),
@@ -855,6 +926,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                 ),
               ),
               IconButton.outlined(
+                tooltip: 'Aumentar vagas',
                 onPressed: _seats < widget.ride.availableSeats
                     ? () => setState(() => _seats++)
                     : null,
@@ -882,6 +954,97 @@ class _RequestDialogState extends State<_RequestDialog> {
           child: const Text('Enviar solicitação'),
         ),
       ],
+    );
+  }
+}
+
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: scheme.onSecondaryContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Chave Pix do motorista, exibida a passageiros aceitos.
+class _PixCard extends StatelessWidget {
+  const _PixCard({required this.pixKey, this.price});
+
+  final String pixKey;
+  final double? price;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 14),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Row(
+          children: [
+            Icon(Icons.pix, color: scheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    price != null
+                        ? 'Pagamento via Pix · ${formatPrice(price)}'
+                        : 'Pagamento via Pix',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  SelectableText(
+                    pixKey,
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Copiar chave Pix',
+              icon: const Icon(Icons.copy),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: pixKey));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Chave Pix copiada.')),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

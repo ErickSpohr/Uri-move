@@ -80,10 +80,11 @@ class ApiClient {
     required String name,
     required Uint8List bytes,
     required String filename,
+    Map<String, String> fields = const {},
   }) async {
     final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
     request.headers.addAll(_headers(json: false));
-    request.fields.addAll({'_method': 'PUT', 'name': name});
+    request.fields.addAll({'_method': 'PUT', 'name': name, ...fields});
     request.files.add(
       http.MultipartFile.fromBytes('photo', bytes, filename: filename),
     );

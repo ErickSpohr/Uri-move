@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RideChatController;
@@ -89,6 +90,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/reports/mine', [ReportController::class, 'mine']);
 
         // Notificações
+        Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
+        Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:20,1');
+        Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);

@@ -37,6 +37,14 @@ class RideResource extends JsonResource
             'is_recurring' => $this->is_recurring,
             'my_request_status' => $authUser ? $this->viewerRequest($authUser)?->status : null,
             'my_request_id' => $authUser ? $this->viewerRequest($authUser)?->id : null,
+            'series_id' => $this->series_id,
+            'women_only' => (bool) $this->women_only,
+            // Chave Pix do motorista só para quem tem vaga confirmada (ou o próprio motorista).
+            'driver_pix_key' => $this->when(
+                $authUser && $this->relationLoaded('driver') && $this->driver?->pix_key
+                    && ($authUser->id === $this->driver_id || $this->resource->canUseChat($authUser)),
+                fn () => $this->driver->pix_key,
+            ),
             'created_at' => $this->created_at,
         ];
     }

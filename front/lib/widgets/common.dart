@@ -119,6 +119,7 @@ class ErrorBanner extends StatelessWidget {
           ),
           if (onDismiss != null)
             IconButton(
+              tooltip: 'Fechar aviso',
               icon: const Icon(Icons.close, size: 18),
               onPressed: onDismiss,
             ),

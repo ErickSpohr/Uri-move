@@ -65,6 +65,7 @@ class User {
     this.rideCount = 0,
     this.course,
     this.campus,
+    this.pixKey,
   });
 
   final int id;
@@ -82,8 +83,12 @@ class User {
   final Course? course;
   final Campus? campus;
 
+  /// Chave Pix (visível apenas para o próprio usuário).
+  final String? pixKey;
+
   bool get isDriver => role == 'driver';
   bool get isAdmin => role == 'admin';
+  bool get isWoman => gender == 'woman';
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: json['id'] as int,
@@ -104,6 +109,7 @@ class User {
     campus: json['campus'] is Map
         ? Campus.fromJson(Map<String, dynamic>.from(json['campus'] as Map))
         : null,
+    pixKey: json['pix_key'] as String?,
   );
 }
 
@@ -163,6 +169,9 @@ class Ride {
     this.myRequestId,
     this.pendingRequestsCount = 0,
     this.canChat = false,
+    this.seriesId,
+    this.womenOnly = false,
+    this.driverPixKey,
   });
 
   final int id;
@@ -184,6 +193,13 @@ class Ride {
   final int? myRequestId;
   final int pendingRequestsCount;
   final bool canChat;
+
+  /// Identificador compartilhado pelas caronas de uma mesma série recorrente.
+  final String? seriesId;
+  final bool womenOnly;
+
+  /// Chave Pix do motorista (enviada só ao motorista e a passageiros aceitos).
+  final String? driverPixKey;
 
   bool get isActive => status == 'active';
   bool get isCompleted => status == 'completed';
@@ -214,6 +230,9 @@ class Ride {
     myRequestId: json['my_request_id'] as int?,
     pendingRequestsCount: json['pending_requests_count'] as int? ?? 0,
     canChat: json['can_chat'] as bool? ?? false,
+    seriesId: json['series_id'] as String?,
+    womenOnly: json['women_only'] as bool? ?? false,
+    driverPixKey: json['driver_pix_key'] as String?,
   );
 }
 

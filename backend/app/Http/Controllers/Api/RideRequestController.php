@@ -35,6 +35,11 @@ class RideRequestController extends Controller
         abort_if($ride->driver_id === $request->user()->id, 422, 'Você não pode solicitar a sua própria carona.');
         abort_if($ride->status !== Ride::STATUS_SCHEDULED, 422, 'A carona não está disponível para solicitação.');
         abort_if(
+            $ride->women_only && ! $request->user()->isWoman(),
+            403,
+            'Esta carona é exclusiva para mulheres.',
+        );
+        abort_if(
             $request->user()->hasBlocked($ride->driver_id) || $request->user()->isBlockedBy($ride->driver_id),
             403,
             'Não é possível solicitar esta carona.',

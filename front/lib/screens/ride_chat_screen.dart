@@ -236,7 +236,7 @@ class _RideChatScreenState extends State<RideChatScreen>
                                 Text(
                                   time,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 12,
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurfaceVariant,

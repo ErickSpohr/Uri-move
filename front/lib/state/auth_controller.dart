@@ -4,6 +4,7 @@ import '../core/token_storage.dart';
 import '../core/profile_photo_picker.dart';
 
 import '../core/api.dart';
+import '../core/push_notifications.dart';
 import '../models/models.dart';
 import '../services/api_repository.dart';
 
@@ -151,14 +152,28 @@ class AuthController extends ChangeNotifier {
   Future<bool> updateProfile({
     required String name,
     PickedProfilePhoto? photo,
+    String? pixKey,
   }) {
     return _run(() async {
-      final data = await _api.updateProfile(name: name, photo: photo);
+      final data = await _api.updateProfile(
+        name: name,
+        photo: photo,
+        pixKey: pixKey,
+      );
       _user = User.fromJson(data);
     });
   }
 
   Future<void> logout() async {
+    // Evita que o próximo usuário deste navegador receba avisos da conta anterior.
+    try {
+      final endpoint = await pushUnsubscribe();
+      if (endpoint != null) {
+        await _api.deletePushSubscription(endpoint);
+      }
+    } catch (_) {
+      // Sem push ou falha de rede: segue com o logout.
+    }
     try {
       await _api.logout();
     } catch (_) {

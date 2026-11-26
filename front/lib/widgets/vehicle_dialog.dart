@@ -146,6 +146,7 @@ class VehicleDialogState extends State<VehicleDialog> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton.outlined(
+                  tooltip: 'Diminuir lugares',
                   onPressed: _seats > 1 ? () => setState(() => _seats--) : null,
                   icon: const Icon(Icons.remove),
                 ),
@@ -154,6 +155,7 @@ class VehicleDialogState extends State<VehicleDialog> {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 IconButton.outlined(
+                  tooltip: 'Aumentar lugares',
                   onPressed: _seats < 12
                       ? () => setState(() => _seats++)
                       : null,
