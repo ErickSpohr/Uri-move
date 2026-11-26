@@ -17,6 +17,8 @@ class RespondRideRequestRequest extends FormRequest
     {
         return [
             'action' => ['required', Rule::in([RideRequest::STATUS_ACCEPTED, RideRequest::STATUS_REJECTED])],
+            // Valor combinado no aceite (rateio): até o sugerido.
+            'price' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
         ];
     }
 }

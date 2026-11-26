@@ -25,7 +25,6 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   double? _originLng;
   double? _destinationLat;
   double? _destinationLng;
-  final _priceController = TextEditingController();
   final _notesController = TextEditingController();
 
   List<Vehicle> _vehicles = [];
@@ -34,6 +33,9 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
   int _seats = 4;
   Vehicle? _vehicle;
   bool _womenOnly = false;
+
+  /// true: rateio calculado pelo app; false: carona gratuita.
+  bool _costSharing = true;
 
   // Repetição semanal: dias ISO (1 = segunda … 7 = domingo) até [_repeatUntil].
   bool _repeat = false;
@@ -70,7 +72,6 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     _auth.dataVersion.removeListener(_loadVehicles);
     _originController.dispose();
     _destinationController.dispose();
-    _priceController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -198,6 +199,18 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
       );
       return;
     }
+    if (_costSharing &&
+        (_originLat == null || _destinationLat == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Para calcular o preço, escolha origem e destino na lista de '
+            'sugestões ou use "Marcar no mapa".',
+          ),
+        ),
+      );
+      return;
+    }
     if (_repeat && _repeatDays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Escolha ao menos um dia da semana.')),
@@ -220,7 +233,7 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
         departureTime:
             '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
         totalSeats: _seats,
-        price: _priceToDouble(),
+        costSharing: _costSharing,
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
@@ -270,11 +283,6 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
     }
   }
 
-  double? _priceToDouble() {
-    final text = _priceController.text.trim().replaceAll(',', '.');
-    if (text.isEmpty) {
-      return null;
-    }
     return double.tryParse(text);
   }
 
@@ -408,21 +416,10 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
+                    _buildPriceMode(context),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _priceController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: 'Preço por vaga (R\$)',
-                              prefixIcon: Icon(Icons.attach_money),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
                         Expanded(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -555,6 +552,41 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildPriceMode(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(
+              value: true,
+              icon: Icon(Icons.local_gas_station_outlined),
+              label: Text('Dividir custos'),
+            ),
+            ButtonSegment(
+              value: false,
+              icon: Icon(Icons.volunteer_activism_outlined),
+              label: Text('Gratuita'),
+            ),
+          ],
+          selected: {_costSharing},
+          onSelectionChanged: (value) =>
+              setState(() => _costSharing = value.first),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _costSharing
+              ? 'O preço é calculado pela distância e pelo consumo do veículo. '
+                    'Cada passageiro paga a parte da viagem mais o desvio até o '
+                    'ponto de embarque dele. Você pode dar desconto ao aceitar.'
+              : 'Ninguém paga nada pela carona.',
+          style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }

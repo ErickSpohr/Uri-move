@@ -208,6 +208,29 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
     );
   }
 
+  /// Aceite com rateio: o motorista confirma o valor sugerido ou dá desconto.
+  Future<void> _respond(Ride ride, RideRequest request, String action) async {
+    double? price;
+    final suggested = request.suggestedPrice;
+    if (action == 'accepted' && suggested != null && suggested > 0) {
+      price = await showDialog<double>(
+        context: context,
+        builder: (_) => _AcceptPriceDialog(
+          suggested: suggested,
+          passengerName: request.passenger?.name.split(' ').first ?? 'o passageiro',
+        ),
+      );
+      if (price == null || !mounted) return;
+    }
+    final api = context.read<AuthController>().api;
+    await _run(
+      () => api.respondRequest(ride.id, request.id, action, price: price),
+      success: action == 'accepted'
+          ? 'Solicitação aceita.'
+          : 'Solicitação recusada.',
+    );
+  }
+
   /// Carona de série: escolhe entre cancelar só esta ou esta e as próximas.
   Future<void> _confirmSeriesCancel(Ride ride) async {
     final wholeSeries = await showDialog<bool>(
@@ -320,13 +343,42 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                         ),
                       ),
                       // Usa a cor do tema para manter contraste no modo escuro.
-                      Text(
-                        formatPrice(ride.price),
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (ride.costSharing &&
+                              ride.price != null &&
+                              ride.myPrice == null)
+                            Text(
+                              'a partir de',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                            ),
+                          if (ride.myPrice != null && !_isDriver)
+                            Text(
+                              'seu valor',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                            ),
+                          Text(
+                            formatPrice(
+                              _isDriver ? ride.price : ride.myPrice ?? ride.price,
+                            ),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -374,6 +426,31 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                       ],
                     ),
                   ],
+                  if (ride.costSharing && !_isDriver && ride.myPrice == null) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.local_gas_station_outlined,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Rateio do combustível: o valor final soma o desvio '
+                            'até o seu ponto de embarque e aparece antes de você '
+                            'pedir a vaga.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (ride.notes != null && ride.notes!.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
@@ -400,7 +477,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               text: 'Carona exclusiva para mulheres',
             ),
           if (!_isDriver && ride.driverPixKey != null)
-            _PixCard(pixKey: ride.driverPixKey!, price: ride.price),
+            _PixCard(pixKey: ride.driverPixKey!, price: ride.myPrice ?? ride.price),
           if (ride.isRecurring)
             Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -511,15 +588,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
                             ),
                           ),
                         ),
-                  onRespond: (action) => _run(
-                    () async => context
-                        .read<AuthController>()
-                        .api
-                        .respondRequest(ride.id, r.id, action),
-                    success: action == 'accepted'
-                        ? 'Solicitação aceita.'
-                        : 'Solicitação recusada.',
-                  ),
+                  onRespond: (action) => _respond(ride, r, action),
                 ),
               ),
           ],
@@ -916,6 +985,36 @@ class _RequestTile extends StatelessWidget {
             ],
             const SizedBox(height: 8),
             _PickupPreview(request: request, ride: ride),
+            if (request.suggestedPrice != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.local_gas_station_outlined,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        [
+                          if (request.detourKm != null)
+                            request.detourKm! < 0.1
+                                ? 'Sem desvio'
+                                : 'Desvio +${request.detourKm!.toStringAsFixed(1).replaceAll('.', ',')} km'
+                                      '${request.detourMinutes != null ? ' (+${request.detourMinutes} min)' : ''}',
+                          'sugerido ${formatPrice(request.suggestedPrice)}',
+                        ].join(' · '),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (onChat != null)
               TextButton.icon(
                 onPressed: onChat,
@@ -976,6 +1075,8 @@ class _RequestChoice {
 class _RequestDialogState extends State<_RequestDialog> {
   int _seats = 1;
   PickupPoint? _pickup;
+  PriceQuote? _quote;
+  bool _quoting = false;
 
   Future<void> _choosePickup() async {
     final picked = await Navigator.of(context).push<PickupPoint>(
@@ -984,7 +1085,28 @@ class _RequestDialogState extends State<_RequestDialog> {
       ),
     );
     if (picked != null && mounted) {
-      setState(() => _pickup = picked);
+      setState(() {
+        _pickup = picked;
+        _quote = null;
+      });
+      if (widget.ride.costSharing) _loadQuote(picked);
+    }
+  }
+
+  /// Valor estimado (parte da viagem + desvio) antes de enviar o pedido.
+  Future<void> _loadQuote(PickupPoint pickup) async {
+    setState(() => _quoting = true);
+    try {
+      final quote = await context.read<AuthController>().api.rideQuote(
+        widget.ride.id,
+        pickup.position.latitude,
+        pickup.position.longitude,
+      );
+      if (mounted && _pickup == pickup) setState(() => _quote = quote);
+    } catch (_) {
+      // Sem orçamento: o pedido segue; o motorista vê o valor sugerido.
+    } finally {
+      if (mounted) setState(() => _quoting = false);
     }
   }
 
@@ -1058,6 +1180,13 @@ class _RequestDialogState extends State<_RequestDialog> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          if (_quoting)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: LinearProgressIndicator(),
+            )
+          else if (_quote != null)
+            _QuoteSummary(quote: _quote!, seats: _seats),
         ],
       ),
       ),
@@ -1280,6 +1409,138 @@ class _PickupPreview extends StatelessWidget {
             icon: const Icon(Icons.open_in_new, size: 16),
             label: const Text('Abrir no Google Maps'),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Resumo do valor estimado no pedido de vaga.
+class _QuoteSummary extends StatelessWidget {
+  const _QuoteSummary({required this.quote, required this.seats});
+
+  final PriceQuote quote;
+  final int seats;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final km = quote.detourKm.toStringAsFixed(1).replaceAll('.', ',');
+    final muted = TextStyle(fontSize: 13, color: scheme.onSurfaceVariant);
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Valor estimado',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Text(
+                formatPrice(quote.suggestedPrice),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Parte da viagem: ${formatPrice(quote.baseShare)}', style: muted),
+          Text(
+            quote.detourKm < 0.1
+                ? 'Sem desvio: seu ponto está no caminho.'
+                : 'Desvio de $km km (+${quote.detourMinutes} min): '
+                      '${formatPrice(quote.detourCost)}',
+            style: muted,
+          ),
+          if (seats > 1) Text('Valor por vaga.', style: muted),
+          if (quote.estimated)
+            Text('Rota estimada; o valor pode variar um pouco.', style: muted),
+        ],
+      ),
+    );
+  }
+}
+
+/// Confirmação do valor no aceite: sugerido por padrão, com desconto livre
+/// até a carona gratuita; nunca acima do sugerido.
+class _AcceptPriceDialog extends StatefulWidget {
+  const _AcceptPriceDialog({
+    required this.suggested,
+    required this.passengerName,
+  });
+
+  final double suggested;
+  final String passengerName;
+
+  @override
+  State<_AcceptPriceDialog> createState() => _AcceptPriceDialogState();
+}
+
+class _AcceptPriceDialogState extends State<_AcceptPriceDialog> {
+  late double _price = widget.suggested;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // Passos de R$ 0,50 entre 0 e o sugerido.
+    final divisions = (widget.suggested * 2).round().clamp(1, 1000);
+    return AlertDialog(
+      title: Text('Aceitar ${widget.passengerName}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Valor combinado por vaga',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            formatPrice(_price),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: scheme.primary,
+            ),
+          ),
+          Slider(
+            value: _price,
+            max: widget.suggested,
+            divisions: divisions,
+            label: formatPrice(_price),
+            semanticFormatterCallback: formatPrice,
+            onChanged: (value) => setState(() => _price = value),
+          ),
+          Text(
+            _price < widget.suggested
+                ? 'Desconto de ${formatPrice(widget.suggested - _price)} sobre o sugerido.'
+                : 'Valor sugerido pelo rateio. Arraste para dar desconto.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Voltar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_price),
+          child: const Text('Aceitar'),
         ),
       ],
     );

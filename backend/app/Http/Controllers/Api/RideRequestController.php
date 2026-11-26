@@ -10,6 +10,7 @@ use App\Models\Ride;
 use App\Models\RidePassenger;
 use App\Models\RideRequest;
 use App\Services\NotificationService;
+use App\Services\Pricing\RidePricing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,11 @@ class RideRequestController extends Controller
 
         abort_if($seats > $ride->available_seats, 422, 'Não há vagas suficientes nesta carona.');
 
+        // Rateio: guarda o orçamento com o desvio até o ponto de embarque.
+        $quote = $ride->cost_sharing && $ride->route_km
+            ? app(RidePricing::class)->quote($ride, (float) $request->input('pickup_lat'), (float) $request->input('pickup_lng'))
+            : null;
+
         $rideRequest = $ride->requests()->create([
             'passenger_id' => $request->user()->id,
             'status' => RideRequest::STATUS_PENDING,
@@ -64,6 +70,9 @@ class RideRequestController extends Controller
             'pickup_lat' => $request->input('pickup_lat'),
             'pickup_lng' => $request->input('pickup_lng'),
             'pickup_label' => $request->input('pickup_label'),
+            'detour_km' => $quote['detour_km'] ?? null,
+            'detour_minutes' => $quote['detour_minutes'] ?? null,
+            'suggested_price' => $quote['suggested_price'] ?? $ride->price,
         ]);
 
         $this->notifications->notifyRideRequestSubmitted($ride->driver, $request->user(), [
@@ -86,6 +95,15 @@ class RideRequestController extends Controller
         $action = $request->action;
 
         if ($action === RideRequest::STATUS_ACCEPTED) {
+            // Valor combinado: o motorista pode reduzir o sugerido, nunca aumentar.
+            $suggested = $rideRequest->suggested_price ?? ($ride->price !== null ? (float) $ride->price : null);
+            $price = $request->filled('price') ? (float) $request->input('price') : $suggested;
+            abort_if(
+                $suggested !== null && $price !== null && $price > $suggested + 0.001,
+                422,
+                'O valor não pode passar do sugerido (R$ '.number_format($suggested, 2, ',', '.').').',
+            );
+            $rideRequest->update(['agreed_price' => $price]);
             $this->accept($ride, $rideRequest);
         } else {
             $this->reject($ride, $rideRequest);

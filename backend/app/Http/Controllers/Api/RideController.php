@@ -11,6 +11,7 @@ use App\Models\RidePassenger;
 use App\Models\RideRequest;
 use App\Models\Vehicle;
 use App\Services\NotificationService;
+use App\Services\Pricing\RidePricing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,7 +20,24 @@ use Illuminate\Support\Str;
 
 class RideController extends Controller
 {
-    public function __construct(private readonly NotificationService $notifications) {}
+    public function __construct(
+        private readonly NotificationService $notifications,
+        private readonly RidePricing $pricing,
+    ) {}
+
+    /**
+     * Orçamento do rateio para um ponto de embarque (prévia antes de pedir a vaga).
+     */
+    public function quote(Request $request, Ride $ride): JsonResponse
+    {
+        $data = $request->validate([
+            'pickup_lat' => ['required', 'numeric', 'between:-90,90'],
+            'pickup_lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+        abort_unless($ride->cost_sharing && $ride->route_km, 422, 'Esta carona não usa preço calculado.');
+
+        return response()->json(['data' => $this->pricing->quote($ride, (float) $data['pickup_lat'], (float) $data['pickup_lng'])]);
+    }
 
     public function index(Request $request)
     {
@@ -106,6 +124,17 @@ class RideController extends Controller
 
         $data['driver_id'] = $request->user()->id;
         $data['available_seats'] = $data['total_seats'];
+        $data['cost_sharing'] = (bool) ($data['cost_sharing'] ?? false);
+
+        if ($data['cost_sharing']) {
+            // Preço exibido ("a partir de") = parte fixa do rateio; o desvio entra por passageiro.
+            $data['route_km'] = $this->pricing->routeKm(
+                (float) $data['origin_lat'], (float) $data['origin_lng'],
+                (float) $data['destination_lat'], (float) $data['destination_lng'],
+            );
+            $data['cost_per_km'] = RidePricing::costPerKm(isset($vehicle) ? $vehicle : null);
+            $data['price'] = RidePricing::baseShare($data['route_km'], $data['cost_per_km'], $data['total_seats']);
+        }
 
         $dates = $this->seriesDates(
             $data['departure_date'],

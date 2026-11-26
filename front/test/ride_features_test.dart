@@ -178,4 +178,35 @@ void main() {
     expect(stop.position, const LatLng(-28.1, -54.7));
     expect(stop.pickedUp, isTrue);
   });
+
+  test('rideQuote lê o orçamento do rateio', () async {
+    final sent = <http.Request>[];
+    final repository = _repository(sent, {
+      'data': {
+        'base_share': 6.5,
+        'detour_km': 4.0,
+        'detour_minutes': 6,
+        'detour_cost': 2.0,
+        'cost_per_km': 0.5,
+        'suggested_price': 8.5,
+        'estimated': false,
+      },
+    });
+
+    final quote = await repository.rideQuote(7, -28.2, -54.6);
+
+    expect(sent.single.url.path, '/api/v1/rides/7/quote');
+    expect(sent.single.url.queryParameters['pickup_lat'], '-28.2');
+    expect(quote.suggestedPrice, 8.5);
+    expect(quote.detourMinutes, 6);
+  });
+
+  test('respondRequest envia o valor combinado', () async {
+    final sent = <http.Request>[];
+    final repository = _repository(sent, {'message': 'ok'});
+
+    await repository.respondRequest(7, 3, 'accepted', price: 5);
+
+    expect(jsonDecode(sent.single.body), {'action': 'accepted', 'price': 5});
+  });
 }

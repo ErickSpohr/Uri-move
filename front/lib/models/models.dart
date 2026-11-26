@@ -128,6 +128,7 @@ class Vehicle {
     this.year,
     this.seats = 4,
     this.isActive = true,
+    this.fuelConsumption,
   });
 
   final int id;
@@ -138,6 +139,9 @@ class Vehicle {
   final int? year;
   final int seats;
   final bool isActive;
+
+  /// Consumo médio (km/L) usado no rateio de custos.
+  final double? fuelConsumption;
 
   String get label => '$brand $model${color != null ? ' ($color)' : ''}';
 
@@ -150,6 +154,7 @@ class Vehicle {
     year: json['year'] as int?,
     seats: json['seats'] as int? ?? 4,
     isActive: json['is_active'] as bool? ?? true,
+    fuelConsumption: (json['fuel_consumption'] as num?)?.toDouble(),
   );
 }
 
@@ -181,6 +186,9 @@ class Ride {
     this.originLng,
     this.destinationLat,
     this.destinationLng,
+    this.costSharing = false,
+    this.routeKm,
+    this.myPrice,
   });
 
   final int id;
@@ -215,6 +223,14 @@ class Ride {
   final double? originLng;
   final double? destinationLat;
   final double? destinationLng;
+
+  /// Rateio de custos: [price] é a parte fixa ("a partir de"); cada passageiro
+  /// paga também o desvio até o seu ponto de embarque.
+  final bool costSharing;
+  final double? routeKm;
+
+  /// Valor do usuário atual: combinado no aceite ou sugerido no pedido.
+  final double? myPrice;
 
   bool get isActive => status == 'active';
   bool get isCompleted => status == 'completed';
@@ -252,6 +268,9 @@ class Ride {
     originLng: (json['origin_lng'] as num?)?.toDouble(),
     destinationLat: (json['destination_lat'] as num?)?.toDouble(),
     destinationLng: (json['destination_lng'] as num?)?.toDouble(),
+    costSharing: json['cost_sharing'] as bool? ?? false,
+    routeKm: (json['route_km'] as num?)?.toDouble(),
+    myPrice: (json['my_price'] as num?)?.toDouble(),
   );
 }
 
@@ -269,6 +288,10 @@ class RideRequest {
     this.pickupLat,
     this.pickupLng,
     this.pickupLabel,
+    this.detourKm,
+    this.detourMinutes,
+    this.suggestedPrice,
+    this.agreedPrice,
   });
 
   final int id;
@@ -285,6 +308,11 @@ class RideRequest {
   final double? pickupLat;
   final double? pickupLng;
   final String? pickupLabel;
+
+  final double? detourKm;
+  final int? detourMinutes;
+  final double? suggestedPrice;
+  final double? agreedPrice;
 
   bool get hasPickup => pickupLat != null && pickupLng != null;
 
@@ -307,6 +335,10 @@ class RideRequest {
     pickupLat: (json['pickup_lat'] as num?)?.toDouble(),
     pickupLng: (json['pickup_lng'] as num?)?.toDouble(),
     pickupLabel: json['pickup_label'] as String?,
+    detourKm: (json['detour_km'] as num?)?.toDouble(),
+    detourMinutes: json['detour_minutes'] as int?,
+    suggestedPrice: (json['suggested_price'] as num?)?.toDouble(),
+    agreedPrice: (json['agreed_price'] as num?)?.toDouble(),
   );
 }
 
@@ -462,4 +494,34 @@ class AdminReport {
       createdAt: json['created_at'] as String?,
     );
   }
+}
+
+/// Orçamento do rateio para um ponto de embarque (GET /rides/{id}/quote).
+class PriceQuote {
+  const PriceQuote({
+    required this.baseShare,
+    required this.detourKm,
+    required this.detourMinutes,
+    required this.detourCost,
+    required this.suggestedPrice,
+    this.estimated = false,
+  });
+
+  final double baseShare;
+  final double detourKm;
+  final int detourMinutes;
+  final double detourCost;
+  final double suggestedPrice;
+
+  /// Rota calculada por estimativa (serviço de rotas indisponível).
+  final bool estimated;
+
+  factory PriceQuote.fromJson(Map<String, dynamic> json) => PriceQuote(
+    baseShare: (json['base_share'] as num).toDouble(),
+    detourKm: (json['detour_km'] as num).toDouble(),
+    detourMinutes: (json['detour_minutes'] as num).toInt(),
+    detourCost: (json['detour_cost'] as num).toDouble(),
+    suggestedPrice: (json['suggested_price'] as num).toDouble(),
+    estimated: json['estimated'] as bool? ?? false,
+  );
 }

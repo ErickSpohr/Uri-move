@@ -63,6 +63,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/rides/{ride}/start', [RideController::class, 'start']);
         Route::post('/rides/{ride}/complete', [RideController::class, 'complete']);
         Route::post('/rides/{ride}/cancel', [RideController::class, 'cancel']);
+        Route::get('/rides/{ride}/quote', [RideController::class, 'quote'])->middleware('throttle:30,1');
         Route::get('/rides/{ride}/location', [RideLocationController::class, 'show']);
         Route::put('/rides/{ride}/location', [RideLocationController::class, 'update'])->middleware('throttle:12,1');
         Route::delete('/rides/{ride}/location', [RideLocationController::class, 'destroy']);
