@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'core/theme.dart';
 import 'env_config.dart';
 import 'screens/splash_screen.dart';
+import 'services/native_push.dart';
 import 'state/auth_controller.dart';
 import 'state/theme_controller.dart';
 
@@ -25,6 +26,7 @@ class URIMoveApp extends StatelessWidget {
       child: Consumer<ThemeController>(
         builder: (context, appearance, _) => MaterialApp(
           title: 'URI Move',
+          scaffoldMessengerKey: NativePush.messengerKey,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),

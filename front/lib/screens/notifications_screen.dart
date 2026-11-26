@@ -93,6 +93,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: Column(
         children: [
           const PushToggleTile(),
+          const NativePushTile(),
           Expanded(child: _buildList()),
         ],
       ),

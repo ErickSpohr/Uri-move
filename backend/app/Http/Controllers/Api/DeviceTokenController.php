@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeviceToken;
+use App\Services\Fcm\FcmSender;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -35,5 +36,20 @@ class DeviceTokenController extends Controller
             ->delete();
 
         return response()->json(['message' => 'Aparelho removido.']);
+    }
+
+    /**
+     * Envia uma notificação de teste ao próprio usuário e devolve o diagnóstico.
+     */
+    public function test(Request $request, FcmSender $fcm): JsonResponse
+    {
+        $report = $fcm->sendToUser(
+            $request->user(),
+            'Teste do URI Move',
+            'Se você está vendo isto, as notificações estão funcionando.',
+            ['type' => 'test'],
+        );
+
+        return response()->json($report);
     }
 }

@@ -284,6 +284,12 @@ class ApiRepository {
     await client.post('/push/devices', body: {'token': token, 'platform': 'android'});
   }
 
+  /// Notificação de teste para os aparelhos do usuário; devolve o diagnóstico.
+  Future<Map<String, dynamic>> testDevicePush() async {
+    final json = await client.post('/push/devices/test');
+    return Map<String, dynamic>.from(json as Map);
+  }
+
   Future<void> unregisterDevice(String token) async {
     await client.delete('/push/devices', query: {'token': token});
   }

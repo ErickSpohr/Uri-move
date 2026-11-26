@@ -96,6 +96,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
         Route::post('/push/devices', [DeviceTokenController::class, 'store'])->middleware('throttle:20,1');
         Route::delete('/push/devices', [DeviceTokenController::class, 'destroy']);
+        Route::post('/push/devices/test', [DeviceTokenController::class, 'test'])->middleware('throttle:5,1');
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);

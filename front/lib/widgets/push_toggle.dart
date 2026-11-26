@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/push_notifications.dart';
+import '../services/native_push.dart';
 import '../state/auth_controller.dart';
 
 /// Ativa/desativa notificações do navegador com o app fechado (Web Push).
@@ -106,6 +107,82 @@ class _PushToggleTileState extends State<PushToggleTile> {
         ),
         value: _enabled,
         onChanged: _busy || denied ? null : _toggle,
+      ),
+    );
+  }
+}
+
+/// App Android: situação das notificações do celular e envio de teste.
+class NativePushTile extends StatefulWidget {
+  const NativePushTile({super.key});
+
+  @override
+  State<NativePushTile> createState() => _NativePushTileState();
+}
+
+class _NativePushTileState extends State<NativePushTile> {
+  bool _busy = false;
+
+  Future<void> _test() async {
+    final api = context.read<AuthController>().api;
+    setState(() => _busy = true);
+    String message;
+    try {
+      if (!await NativePush.register(api)) {
+        message = NativePush.lastError ?? 'Não foi possível registrar o celular.';
+      } else {
+        final report = await api.testDevicePush();
+        final errors = (report['errors'] as List? ?? const []).join('\n');
+        if ((report['sent'] as int? ?? 0) > 0) {
+          message = 'Enviada! Ela aparece na barra do celular com o app fechado, '
+              'ou como aviso aqui com o app aberto.';
+        } else if (report['configured'] != true) {
+          message = 'O servidor ainda não tem a chave do Firebase. $errors';
+        } else if ((report['devices'] as int? ?? 0) == 0) {
+          message = 'O celular não ficou registrado no servidor.';
+        } else {
+          message = 'O Firebase recusou o envio:\n$errors';
+        }
+      }
+    } catch (_) {
+      message = 'Falha de conexão com o servidor.';
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Teste de notificação'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!NativePush.configured) return const SizedBox.shrink();
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: ListTile(
+        leading: const Icon(Icons.notifications_active_outlined),
+        title: const Text('Notificações do celular'),
+        subtitle: const Text(
+          'Avisos de pedidos, respostas, mensagens e chegada do motorista, '
+          'mesmo com o app fechado.',
+        ),
+        trailing: _busy
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : TextButton(onPressed: _test, child: const Text('Testar')),
       ),
     );
   }

@@ -86,26 +86,35 @@ class FcmSender
     }
 
     /**
+     * Envia para todos os aparelhos do usuário e devolve um relatório (usado no teste do app).
+     *
      * @param  array<string, mixed>  $data
+     * @return array{configured: bool, devices: int, sent: int, errors: list<string>}
      */
-    public function sendToUser(User $user, string $title, ?string $body, array $data = []): void
+    public function sendToUser(User $user, string $title, ?string $body, array $data = []): array
     {
+        $report = ['configured' => false, 'devices' => 0, 'sent' => 0, 'errors' => []];
         $credentials = $this->credentials();
         if ($credentials === null) {
-            return;
+            $report['errors'][] = 'FIREBASE_CREDENTIALS ausente ou inválido no servidor.';
+
+            return $report;
         }
+        $report['configured'] = true;
 
         $tokens = DeviceToken::query()->where('user_id', $user->id)->get();
+        $report['devices'] = $tokens->count();
         if ($tokens->isEmpty()) {
-            return;
+            return $report;
         }
 
         try {
             $accessToken = $this->accessToken($credentials);
         } catch (Throwable $e) {
             Log::warning('FCM indisponível', ['error' => $e->getMessage()]);
+            $report['errors'][] = $e->getMessage();
 
-            return;
+            return $report;
         }
 
         $url = "https://fcm.googleapis.com/v1/projects/{$credentials['project_id']}/messages:send";
@@ -131,6 +140,11 @@ class FcmSender
 
                 // Token não registrado/inválido: o app foi desinstalado ou o token mudou.
                 $status = $response->json('error.status');
+                if ($response->successful()) {
+                    $report['sent']++;
+                } else {
+                    $report['errors'][] = "FCM {$response->status()}: ".($response->json('error.message') ?? $status ?? 'erro');
+                }
                 if (in_array($status, ['NOT_FOUND', 'UNREGISTERED'], true)) {
                     $device->delete();
                 } elseif ($response->status() === 401) {
@@ -140,7 +154,10 @@ class FcmSender
                 }
             } catch (Throwable $e) {
                 Log::warning('Falha no envio FCM', ['error' => $e->getMessage(), 'device' => $device->id]);
+                $report['errors'][] = $e->getMessage();
             }
         }
+
+        return $report;
     }
 }

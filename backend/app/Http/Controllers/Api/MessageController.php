@@ -9,6 +9,8 @@ use App\Models\Message;
 use App\Models\Ride;
 use App\Models\RidePassenger;
 use App\Models\RideRequest;
+use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -75,6 +77,15 @@ class MessageController extends Controller
             'receiver_id' => $otherId,
             'body' => $request->body,
         ]);
+
+        if ($receiver = User::find($otherId)) {
+            app(NotificationService::class)->pushOnly(
+                [$receiver],
+                "Mensagem de {$request->user()->name}",
+                NotificationService::preview($message->body),
+                ['type' => 'chat_message', 'ride_id' => $ride->id, 'from_user_id' => $request->user()->id],
+            );
+        }
 
         return response()->json([
             'message' => 'Mensagem enviada.',
