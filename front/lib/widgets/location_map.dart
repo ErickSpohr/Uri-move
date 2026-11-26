@@ -10,7 +10,12 @@ import '../core/theme.dart';
 import 'map_tiles.dart';
 
 class LocationMap extends StatefulWidget {
-  const LocationMap({super.key});
+  const LocationMap({super.key, this.height = 210, this.scrollFriendly = false});
+
+  final double height;
+
+  /// Dentro de uma página rolável: sem arrastar o mapa (o gesto rola a página).
+  final bool scrollFriendly;
 
   @override
   State<LocationMap> createState() => _LocationMapState();
@@ -131,16 +136,21 @@ class _LocationMapState extends State<LocationMap> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(
-          height: 210,
+          height: widget.height,
           child: Stack(
             children: [
               FlutterMap(
                 mapController: _mapController,
-                options: const MapOptions(
+                options: MapOptions(
                   initialCenter: _fallbackCenter,
                   initialZoom: 13,
                   minZoom: 3,
                   maxZoom: 19,
+                  interactionOptions: InteractionOptions(
+                    flags: widget.scrollFriendly
+                        ? InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom
+                        : InteractiveFlag.all,
+                  ),
                 ),
                 children: [
                   AppMapTiles.layer(context),
