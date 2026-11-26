@@ -18,7 +18,11 @@ const _rideJson = {
 ApiRepository _repository(List<http.Request> sent, Map<String, dynamic> body) {
   final client = MockClient((request) async {
     sent.add(request);
-    return http.Response(jsonEncode(body), 200);
+    return http.Response(
+      jsonEncode(body),
+      200,
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
   });
   return ApiRepository(
     ApiClient(baseUrl: 'https://api.test/api/v1', client: client),
