@@ -20,5 +20,7 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
 fi
 
 php artisan config:cache --no-interaction
+php artisan route:cache --no-interaction
+php artisan event:cache --no-interaction
 php artisan storage:link --no-interaction
 exec apache2-foreground
