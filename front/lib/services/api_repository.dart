@@ -266,6 +266,14 @@ class ApiRepository {
     await client.post('/push/subscriptions', body: subscription);
   }
 
+  Future<void> registerDevice(String token) async {
+    await client.post('/push/devices', body: {'token': token, 'platform': 'android'});
+  }
+
+  Future<void> unregisterDevice(String token) async {
+    await client.delete('/push/devices', query: {'token': token});
+  }
+
   Future<void> deletePushSubscription(String endpoint) async {
     await client.delete('/push/subscriptions', query: {'endpoint': endpoint});
   }

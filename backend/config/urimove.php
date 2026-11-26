@@ -39,4 +39,7 @@ return [
         'trim',
         explode(',', (string) env('ADMIN_EMAILS', '')),
     ))),
+
+    // Conta de serviço do Firebase (JSON, ou JSON em base64) para notificações no app Android.
+    'firebase_credentials' => env('FIREBASE_CREDENTIALS'),
 ];

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Report;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Services\Fcm\FcmSender;
 use App\Services\WebPush\WebPushSender;
 
 use function Illuminate\Support\defer;
@@ -27,14 +28,17 @@ class NotificationService
             'payload' => $payload,
         ]);
 
-        // Push para navegadores inscritos, executado após o envio da resposta HTTP.
-        defer(fn () => app(WebPushSender::class)->sendToUser($user, [
-            'title' => $title,
-            'body' => $body,
+        // Push para navegadores (Web Push) e para o app Android (FCM),
+        // executado após o envio da resposta HTTP.
+        $data = [
             'type' => $type,
             'notification_id' => $notification->id,
             'ride_id' => $payload['ride_id'] ?? null,
-        ]));
+        ];
+        defer(function () use ($user, $title, $body, $data) {
+            app(WebPushSender::class)->sendToUser($user, ['title' => $title, 'body' => $body] + $data);
+            app(FcmSender::class)->sendToUser($user, $title, $body, $data);
+        });
 
         return $notification;
     }

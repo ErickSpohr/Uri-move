@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\CampusController;
 use App\Http\Controllers\Api\ChatUnreadController;
 use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\FavoriteRouteController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NotificationController;
@@ -93,6 +94,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
         Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store'])->middleware('throttle:20,1');
         Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
+        Route::post('/push/devices', [DeviceTokenController::class, 'store'])->middleware('throttle:20,1');
+        Route::delete('/push/devices', [DeviceTokenController::class, 'destroy']);
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
         Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
