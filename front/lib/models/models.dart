@@ -247,6 +247,9 @@ class RideRequest {
     this.message,
     this.respondedAt,
     this.createdAt,
+    this.pickupLat,
+    this.pickupLng,
+    this.pickupLabel,
   });
 
   final int id;
@@ -258,6 +261,13 @@ class RideRequest {
   final String? message;
   final String? respondedAt;
   final String? createdAt;
+
+  /// Ponto de encontro escolhido pelo passageiro (opcional).
+  final double? pickupLat;
+  final double? pickupLng;
+  final String? pickupLabel;
+
+  bool get hasPickup => pickupLat != null && pickupLng != null;
 
   bool get isPending => status == 'pending';
 
@@ -275,6 +285,9 @@ class RideRequest {
     message: json['message'] as String?,
     respondedAt: json['responded_at'] as String?,
     createdAt: json['created_at'] as String?,
+    pickupLat: (json['pickup_lat'] as num?)?.toDouble(),
+    pickupLng: (json['pickup_lng'] as num?)?.toDouble(),
+    pickupLabel: json['pickup_label'] as String?,
   );
 }
 

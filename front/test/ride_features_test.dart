@@ -5,8 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:uri_move_app/core/api.dart';
 import 'package:uri_move_app/core/push_notifications.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:uri_move_app/models/models.dart';
+import 'package:uri_move_app/screens/ride_tracking_screen.dart';
 import 'package:uri_move_app/services/api_repository.dart';
+import 'package:uri_move_app/services/route_service.dart';
 
 const _rideJson = {
   'id': 7,
@@ -113,5 +116,66 @@ void main() {
     expect(pushSupported(), isFalse);
     expect(await pushCurrentSubscription(), isNull);
     expect(await pushUnsubscribe(), isNull);
+  });
+
+  test('requestRide envia o ponto de encontro', () async {
+    final sent = <http.Request>[];
+    final repository = _repository(sent, {
+      'request': {
+        'id': 3,
+        'ride_id': 7,
+        'status': 'pending',
+        'pickup_lat': -28.1,
+        'pickup_lng': -54.7,
+        'pickup_label': 'Praça',
+      },
+    });
+
+    final request = await repository.requestRide(
+      7,
+      pickupLat: -28.1,
+      pickupLng: -54.7,
+      pickupLabel: 'Praça',
+    );
+
+    final body = jsonDecode(sent.single.body) as Map<String, dynamic>;
+    expect(body['pickup_lat'], -28.1);
+    expect(body['pickup_label'], 'Praça');
+    expect(request.hasPickup, isTrue);
+  });
+
+  test('RouteService lê geometria GeoJSON (lng, lat) do OSRM', () {
+    final route = RouteService.parse({
+      'code': 'Ok',
+      'routes': [
+        {
+          'distance': 3200.5,
+          'duration': 400.0,
+          'geometry': {
+            'coordinates': [
+              [-54.74, -28.15],
+              [-54.26, -28.30],
+            ],
+          },
+        },
+      ],
+    })!;
+
+    expect(route.points.first, const LatLng(-28.15, -54.74));
+    expect(route.durationSeconds, 400);
+    expect(RouteService.parse({'code': 'NoRoute', 'routes': []}), isNull);
+  });
+
+  test('TrackingStop lê a parada do passageiro', () {
+    final stop = TrackingStop.fromJson({
+      'passenger_id': 5,
+      'passenger_name': 'Ana Souza',
+      'latitude': -28.1,
+      'longitude': -54.7,
+      'picked_up': true,
+    });
+
+    expect(stop.position, const LatLng(-28.1, -54.7));
+    expect(stop.pickedUp, isTrue);
   });
 }

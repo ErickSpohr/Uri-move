@@ -275,12 +275,21 @@ class ApiRepository {
     int rideId, {
     int seats = 1,
     String? message,
+    double? pickupLat,
+    double? pickupLng,
+    String? pickupLabel,
   }) async {
     final json = await client.post(
       '/rides/$rideId/requests',
       body: {
         'seats_requested': seats,
         if (message != null && message.isNotEmpty) 'message': message,
+        if (pickupLat != null && pickupLng != null) ...{
+          'pickup_lat': pickupLat,
+          'pickup_lng': pickupLng,
+        },
+        if (pickupLabel != null && pickupLabel.isNotEmpty)
+          'pickup_label': pickupLabel,
       },
     );
     return RideRequest.fromJson(

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['ride_id', 'passenger_id', 'status', 'seats_requested', 'message', 'responded_at'])]
+#[Fillable(['ride_id', 'passenger_id', 'status', 'seats_requested', 'message', 'responded_at', 'pickup_lat', 'pickup_lng', 'pickup_label', 'near_notified_at', 'arrived_notified_at'])]
 class RideRequest extends Model
 {
     use HasFactory;
@@ -25,6 +25,10 @@ class RideRequest extends Model
         return [
             'seats_requested' => 'integer',
             'responded_at' => 'datetime',
+            'pickup_lat' => 'float',
+            'pickup_lng' => 'float',
+            'near_notified_at' => 'datetime',
+            'arrived_notified_at' => 'datetime',
         ];
     }
 
