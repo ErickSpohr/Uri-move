@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/user_safety.dart';
+import 'pickup_picker_screen.dart';
 import 'rate_ride_screen.dart';
 import 'ride_chat_screen.dart';
 import 'private_ride_chat_screen.dart';
@@ -132,15 +133,18 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
 
   void _openRequestDialog() async {
     final ride = _ride!;
-    final seats = await showDialog<int>(
+    final choice = await showDialog<_RequestChoice>(
       context: context,
       builder: (dialogContext) => _RequestDialog(ride: ride),
     );
-    if (seats != null && mounted) {
+    if (choice != null && mounted) {
       _run(() async {
         await context.read<AuthController>().api.requestRide(
           ride.id,
-          seats: seats,
+          seats: choice.seats,
+          pickupLat: choice.pickup?.position.latitude,
+          pickupLng: choice.pickup?.position.longitude,
+          pickupLabel: choice.pickup?.label,
         );
       }, success: 'Solicitação enviada! Aguarde a confirmação do motorista.');
     }
@@ -844,6 +848,25 @@ class _RequestTile extends StatelessWidget {
                 ),
               ),
             ],
+            if (request.hasPickup) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.place_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Embarque: ${request.pickupLabel ?? 'ponto marcado no mapa'}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (onChat != null)
               TextButton.icon(
                 onPressed: onChat,
@@ -893,14 +916,35 @@ class _RequestDialog extends StatefulWidget {
   State<_RequestDialog> createState() => _RequestDialogState();
 }
 
+/// Resultado do diálogo de solicitação.
+class _RequestChoice {
+  const _RequestChoice(this.seats, this.pickup);
+
+  final int seats;
+  final PickupPoint? pickup;
+}
+
 class _RequestDialogState extends State<_RequestDialog> {
   int _seats = 1;
+  PickupPoint? _pickup;
+
+  Future<void> _choosePickup() async {
+    final picked = await Navigator.of(context).push<PickupPoint>(
+      MaterialPageRoute(
+        builder: (_) => PickupPickerScreen(initial: _pickup),
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() => _pickup = picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Solicitar vaga'),
-      content: Column(
+      content: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -942,7 +986,31 @@ class _RequestDialogState extends State<_RequestDialog> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _choosePickup,
+            icon: Icon(
+              _pickup == null ? Icons.add_location_alt_outlined : Icons.edit_location_alt,
+            ),
+            label: Text(
+              _pickup == null
+                  ? 'Escolher ponto de encontro'
+                  : (_pickup!.label ?? 'Ponto de encontro marcado'),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Opcional. O motorista vê o ponto no mapa e você é avisado '
+            'quando ele estiver chegando.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
+      ),
       ),
       actions: [
         TextButton(
@@ -950,7 +1018,8 @@ class _RequestDialogState extends State<_RequestDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(_seats),
+          onPressed: () =>
+              Navigator.of(context).pop(_RequestChoice(_seats, _pickup)),
           child: const Text('Enviar solicitação'),
         ),
       ],

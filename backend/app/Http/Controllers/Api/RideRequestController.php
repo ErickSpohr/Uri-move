@@ -61,6 +61,9 @@ class RideRequestController extends Controller
             'status' => RideRequest::STATUS_PENDING,
             'seats_requested' => $seats,
             'message' => $request->message,
+            'pickup_lat' => $request->input('pickup_lat'),
+            'pickup_lng' => $request->input('pickup_lng'),
+            'pickup_label' => $request->input('pickup_label'),
         ]);
 
         $this->notifications->notifyRideRequestSubmitted($ride->driver, $request->user(), [
