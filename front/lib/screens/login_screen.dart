@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/theme.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
 import 'main_shell.dart';
@@ -75,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Center(child: _Logo()),
+                    const Center(child: AppLogo(height: 150)),
                     const SizedBox(height: 28),
                     Text(
                       'Entrar',
@@ -179,23 +178,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Logo extends StatelessWidget {
-  const _Logo();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 84,
-      height: 84,
-      decoration: BoxDecoration(
-        color: AppTheme.primary,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: const Icon(Icons.directions_car, size: 46, color: Colors.white),
     );
   }
 }

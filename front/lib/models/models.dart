@@ -288,3 +288,68 @@ class NotificationItem {
         createdAt: json['created_at'] as String?,
       );
 }
+
+/// Participante de uma carona listado para avaliação.
+class RideParticipant {
+  RideParticipant({
+    required this.user,
+    required this.role,
+    required this.alreadyRated,
+  });
+
+  final User user;
+  final String role;
+  final bool alreadyRated;
+
+  bool get isDriver => role == 'driver';
+
+  factory RideParticipant.fromJson(Map<String, dynamic> json) =>
+      RideParticipant(
+        user: User.fromJson(Map<String, dynamic>.from(json['user'] as Map)),
+        role: json['role'] as String? ?? 'passenger',
+        alreadyRated: json['already_rated'] as bool? ?? false,
+      );
+}
+
+/// Resumo de mensagens não lidas: chat em grupo por carona e privado por remetente.
+class ChatUnread {
+  const ChatUnread({
+    this.total = 0,
+    this.rides = const {},
+    this.private = const {},
+  });
+
+  final int total;
+
+  /// Não lidas do chat em grupo, por `rideId`.
+  final Map<int, int> rides;
+
+  /// Não lidas de conversas privadas, por chave [privateKey].
+  final Map<String, int> private;
+
+  static String privateKey(int rideId, int userId) => '$rideId:$userId';
+
+  int forRide(int rideId) => rides[rideId] ?? 0;
+
+  int forPrivate(int rideId, int userId) =>
+      private[privateKey(rideId, userId)] ?? 0;
+
+  factory ChatUnread.fromJson(Map<String, dynamic> json) {
+    final rides = <int, int>{};
+    for (final item in (json['rides'] as List? ?? const [])) {
+      final map = Map<String, dynamic>.from(item as Map);
+      rides[map['ride_id'] as int] = map['count'] as int;
+    }
+    final private = <String, int>{};
+    for (final item in (json['private'] as List? ?? const [])) {
+      final map = Map<String, dynamic>.from(item as Map);
+      private[privateKey(map['ride_id'] as int, map['user_id'] as int)] =
+          map['count'] as int;
+    }
+    return ChatUnread(
+      total: json['total'] as int? ?? 0,
+      rides: rides,
+      private: private,
+    );
+  }
+}

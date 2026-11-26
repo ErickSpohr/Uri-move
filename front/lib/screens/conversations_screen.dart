@@ -9,9 +9,18 @@ import 'ride_chat_screen.dart';
 
 /// Reúne as conversas das solicitações e das caronas do usuário.
 class ConversationsScreen extends StatefulWidget {
-  const ConversationsScreen({super.key, required this.active});
+  const ConversationsScreen({
+    super.key,
+    required this.active,
+    this.unread = const ChatUnread(),
+    this.onConversationClosed,
+  });
 
   final bool active;
+  final ChatUnread unread;
+
+  /// Chamado ao voltar de um chat, para atualizar o contador de não lidas.
+  final VoidCallback? onConversationClosed;
 
   @override
   State<ConversationsScreen> createState() => _ConversationsScreenState();
@@ -135,8 +144,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               ),
       ),
     );
+    widget.onConversationClosed?.call();
     if (mounted) _load();
   }
+
+  int _unreadFor(_Conversation conversation) => conversation.peer == null
+      ? widget.unread.forRide(conversation.ride.id)
+      : widget.unread.forPrivate(conversation.ride.id, conversation.peer!.id);
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +201,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           ),
                           title: Text(conversation.title),
                           subtitle: Text(conversation.detail),
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: _unreadFor(conversation) > 0
+                              ? Badge(
+                                  label: Text('${_unreadFor(conversation)}'),
+                                  largeSize: 22,
+                                )
+                              : const Icon(Icons.chevron_right),
                           onTap: () => _open(conversation),
                         );
                       },

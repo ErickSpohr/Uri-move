@@ -159,3 +159,26 @@ class EmptyState extends StatelessWidget {
     );
   }
 }
+
+/// Logo do URI Move sobre fundo branco arredondado (legível também no tema escuro).
+class AppLogo extends StatelessWidget {
+  const AppLogo({super.key, this.height = 150});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(height * 0.08),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(height * 0.12),
+      ),
+      child: Image.asset(
+        'assets/images/logo.png',
+        height: height,
+        semanticLabel: 'URI Move',
+      ),
+    );
+  }
+}

@@ -94,8 +94,8 @@ class ApiClient {
     return _decode(response);
   }
 
-  Future<dynamic> delete(String path) {
-    return _send('DELETE', path);
+  Future<dynamic> delete(String path, {Map<String, String>? query}) {
+    return _send('DELETE', path, query: query);
   }
 
   Future<dynamic> _send(

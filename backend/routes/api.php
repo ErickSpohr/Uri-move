@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\CampusController;
+use App\Http\Controllers\Api\ChatUnreadController;
 use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\FavoriteRouteController;
 use App\Http\Controllers\Api\MessageController;
@@ -76,10 +77,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/rides/{ride}/messages', [MessageController::class, 'index']);
         Route::post('/rides/{ride}/messages', [MessageController::class, 'store']);
         Route::patch('/messages/{message}/read', [MessageController::class, 'markRead']);
+        Route::get('/chats/unread', ChatUnreadController::class);
 
         // Avaliações
         Route::post('/ratings', [RatingController::class, 'store']);
         Route::get('/users/{user}/ratings', [RatingController::class, 'userRatings']);
+        Route::get('/rides/{ride}/participants', [RatingController::class, 'participants']);
 
         // Denúncias
         Route::post('/reports', [ReportController::class, 'store']);

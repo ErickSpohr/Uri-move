@@ -7,6 +7,8 @@ import '../core/theme.dart';
 import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/user_safety.dart';
+import 'rate_ride_screen.dart';
 import 'ride_chat_screen.dart';
 import 'private_ride_chat_screen.dart';
 import 'ride_tracking_screen.dart';
@@ -301,7 +303,7 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _DriverCard(ride: ride),
+          _DriverCard(ride: ride, showSafetyMenu: !_isDriver),
           const SizedBox(height: 14),
           if (ride.isRecurring)
             Container(
@@ -327,6 +329,21 @@ class _RideDetailScreenState extends State<RideDetailScreen> {
               ),
             ),
           _buildActions(context, ride),
+          if (ride.isCompleted &&
+              (_isDriver || ride.myRequestStatus == 'accepted')) ...[
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RateRideScreen(ride: ride),
+                ),
+              ),
+              icon: const Icon(Icons.star_outline),
+              label: Text(
+                _isDriver ? 'Avaliar passageiros' : 'Avaliar participantes',
+              ),
+            ),
+          ],
           if (ride.isActive && ride.canChat) ...[
             const SizedBox(height: 14),
             FilledButton.icon(
@@ -568,9 +585,10 @@ class _DetailItem extends StatelessWidget {
 }
 
 class _DriverCard extends StatelessWidget {
-  const _DriverCard({required this.ride});
+  const _DriverCard({required this.ride, this.showSafetyMenu = false});
 
   final Ride ride;
+  final bool showSafetyMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -638,6 +656,7 @@ class _DriverCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (showSafetyMenu) UserSafetyMenu(user: driver, rideId: ride.id),
           ],
         ),
       ),
