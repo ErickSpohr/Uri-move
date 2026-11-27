@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../core/permissions.dart';
 import '../core/theme.dart';
 import 'map_tiles.dart';
 
@@ -28,6 +29,9 @@ class _LocationMapState extends State<LocationMap> {
 
   Position? _position;
   bool _locating = false;
+
+  /// MapController só pode ser usado depois que o FlutterMap foi desenhado.
+  bool _mapReady = false;
   String? _locationMessage;
 
   @override
@@ -57,7 +61,7 @@ class _LocationMapState extends State<LocationMap> {
         _position = position;
         _locating = false;
       });
-      _mapController.move(point, 16);
+      if (_mapReady) _mapController.move(point, 16);
     } on _LocationFailure catch (error) {
       _showLocationError(error.message);
     } on TimeoutException {
@@ -81,7 +85,7 @@ class _LocationMapState extends State<LocationMap> {
 
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await AppPermissions.requestLocation();
     }
     if (permission == LocationPermission.denied) {
       throw const _LocationFailure(
@@ -146,6 +150,16 @@ class _LocationMapState extends State<LocationMap> {
                   initialZoom: 13,
                   minZoom: 3,
                   maxZoom: 19,
+                  onMapReady: () {
+                    _mapReady = true;
+                    final position = _position;
+                    if (position != null) {
+                      _mapController.move(
+                        LatLng(position.latitude, position.longitude),
+                        16,
+                      );
+                    }
+                  },
                   interactionOptions: InteractionOptions(
                     flags: widget.scrollFriendly
                         ? InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom

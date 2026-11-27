@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
+import '../core/permissions.dart';
 import '../models/models.dart';
 import '../core/api.dart';
 import '../services/api_repository.dart';
@@ -312,7 +313,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen>
     }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await AppPermissions.requestLocation();
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {

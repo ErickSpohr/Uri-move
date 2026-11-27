@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../core/permissions.dart';
 import '../core/api.dart';
 import 'api_repository.dart';
 
@@ -112,7 +113,7 @@ class RideLocationSharer extends ChangeNotifier {
     }
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await AppPermissions.requestLocation();
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
