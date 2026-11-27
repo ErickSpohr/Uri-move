@@ -95,6 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           const PushToggleTile(),
           const NativePushTile(),
+          const _RideAlertsTile(),
           Expanded(child: _buildList()),
         ],
       ),
@@ -226,6 +227,111 @@ class _NotificationCard extends StatelessWidget {
           ],
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Avisos "Me avise quando aparecer" ativos, com opção de apagar.
+class _RideAlertsTile extends StatefulWidget {
+  const _RideAlertsTile();
+
+  @override
+  State<_RideAlertsTile> createState() => _RideAlertsTileState();
+}
+
+class _RideAlertsTileState extends State<_RideAlertsTile> {
+  List<RideAlert> _alerts = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final alerts = await context.read<AuthController>().api.rideAlerts();
+      if (mounted) setState(() => _alerts = alerts);
+    } catch (_) {
+      // Lista opcional: sem conexão, simplesmente não aparece.
+    }
+  }
+
+  Future<void> _openSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Text(
+                  'Avisos de carona',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Você recebe uma notificação quando alguém publicar uma carona '
+                  'parecida. Cada aviso vale por 30 dias.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              if (_alerts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('Nenhum aviso ativo.'),
+                ),
+              for (final alert in _alerts)
+                ListTile(
+                  leading: const Icon(Icons.notifications_active_outlined),
+                  title: Text(alert.description),
+                  trailing: IconButton(
+                    tooltip: 'Apagar aviso',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () async {
+                      await context
+                          .read<AuthController>()
+                          .api
+                          .deleteRideAlert(alert.id)
+                          .catchError((_) {});
+                      setState(
+                        () => _alerts = _alerts
+                            .where((a) => a.id != alert.id)
+                            .toList(),
+                      );
+                      setSheetState(() {});
+                    },
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_alerts.isEmpty) return const SizedBox.shrink();
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: ListTile(
+        leading: const Icon(Icons.manage_search),
+        title: const Text('Avisos de carona'),
+        subtitle: Text(
+          _alerts.length == 1
+              ? '1 aviso ativo'
+              : '${_alerts.length} avisos ativos',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _openSheet,
       ),
     );
   }

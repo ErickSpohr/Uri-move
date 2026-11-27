@@ -35,6 +35,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _period != null || _priceMax != null || _womenOnly;
 
   List<Ride> _rides = [];
+
+  /// Aviso criado para a busca atual (null: ainda não pediu para ser avisado).
+  RideAlert? _alert;
+  bool _savingAlert = false;
   bool _loading = true;
   String? _error;
 
@@ -50,8 +54,53 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _reloadSilently() => _load(silent: true);
 
+  /// "Me avise quando aparecer": salva a busca atual (origem, destino, turno).
+  Future<void> _createAlert() async {
+    final origin = _originController.text.trim();
+    final destination = _destinationController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+    if (origin.isEmpty && destination.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Preencha a origem ou o destino para criar o aviso.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _savingAlert = true);
+    try {
+      final alert = await _auth.api.createRideAlert(
+        origin: origin,
+        destination: destination,
+        fromTime: _period?.from,
+        toTime: _period?.to,
+      );
+      if (mounted) setState(() => _alert = alert);
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Não foi possível criar o aviso.')),
+      );
+    } finally {
+      if (mounted) setState(() => _savingAlert = false);
+    }
+  }
+
+  Future<void> _cancelAlert() async {
+    final alert = _alert;
+    if (alert == null) return;
+    setState(() => _alert = null);
+    try {
+      await _auth.api.deleteRideAlert(alert.id);
+    } catch (_) {
+      if (mounted) setState(() => _alert = alert);
+    }
+  }
+
   /// [silent] mantém a lista atual na tela enquanto recarrega.
   Future<void> _load({bool silent = false}) async {
+    if (!silent) _alert = null;
     setState(() {
       _loading = !silent || _rides.isEmpty;
       _error = null;
@@ -355,6 +404,44 @@ class _HomeScreenState extends State<HomeScreen> {
                     '${formatDate(_date.toIso8601String().split('T').first)}.\n'
                     'Tente outro dia, horário ou destino.',
               ),
+              const SizedBox(height: 4),
+              if (_alert == null)
+                FilledButton.tonalIcon(
+                  onPressed: _savingAlert ? null : _createAlert,
+                  icon: _savingAlert
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.notifications_active_outlined),
+                  label: const Text('Me avise quando aparecer'),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green.shade700),
+                          const SizedBox(width: 6),
+                          const Flexible(
+                            child: Text(
+                              'Você será avisado quando aparecer uma carona assim.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: _cancelAlert,
+                        child: const Text('Cancelar aviso'),
+                      ),
+                    ],
+                  ),
+                ),
               if (_hasExtraFilters)
                 TextButton.icon(
                   onPressed: _clearFilters,

@@ -9,6 +9,7 @@ class HowItWorksScreen extends StatelessWidget {
       'Na aba Explorar, informe origem, destino e data. Digite "uri" para ver os câmpus.',
       'Use os filtros Manhã, Tarde, Noite e Preço para refinar.',
       'Toque numa carona para ver o trajeto no mapa, o motorista e o valor.',
+      'Nada encontrado? Toque em "Me avise quando aparecer" e receba uma notificação quando alguém publicar uma carona parecida.',
     ]),
     (Icons.person_add_alt_1, 'Pedir uma vaga', [
       'Em "Solicitar vaga", marque no mapa onde você vai embarcar.',

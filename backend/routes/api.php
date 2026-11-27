@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RideAlertController;
 use App\Http\Controllers\Api\RideChatController;
 use App\Http\Controllers\Api\RideController;
 use App\Http\Controllers\Api\RideLocationController;
@@ -106,6 +107,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
 
         // Rotas favoritas
+        Route::get('/ride-alerts', [RideAlertController::class, 'index']);
+        Route::post('/ride-alerts', [RideAlertController::class, 'store'])->middleware('throttle:20,1');
+        Route::delete('/ride-alerts/{rideAlert}', [RideAlertController::class, 'destroy']);
         Route::get('/favorite-routes', [FavoriteRouteController::class, 'index']);
         Route::post('/favorite-routes', [FavoriteRouteController::class, 'store']);
         Route::delete('/favorite-routes/{favoriteRoute}', [FavoriteRouteController::class, 'destroy']);
