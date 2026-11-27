@@ -16,6 +16,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _failed = false;
+
   @override
   void initState() {
     super.initState();
@@ -24,10 +26,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _init() async {
     final auth = context.read<AuthController>();
+    if (_failed) setState(() => _failed = false);
     if (!auth.ready) {
       await auth.restore();
     }
     if (!mounted) {
+      return;
+    }
+    if (auth.restoreFailed) {
+      setState(() => _failed = true);
       return;
     }
     // Primeiro acesso no aparelho (sem login salvo): apresentação antes do login.
@@ -68,7 +75,27 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 28),
-            const LoadingIndicator(padding: EdgeInsets.symmetric(horizontal: 32)),
+            if (_failed)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Não foi possível conectar. O servidor pode estar '
+                      'iniciando, aguarde alguns segundos.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _init,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Tentar novamente'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const LoadingIndicator(padding: EdgeInsets.symmetric(horizontal: 32)),
           ],
         ),
       ),

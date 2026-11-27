@@ -58,22 +58,30 @@ class AuthController extends ChangeNotifier {
     }
 
     _api.client.setToken(token);
+    restoreFailed = false;
     try {
       final user = User.fromJson(await _api.me());
       _user = user;
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
+        // Token revogado ou expirado: aí sim é preciso entrar de novo.
         await _tokenStorage.clear();
         _api.client.setToken(null);
+      } else {
+        restoreFailed = true;
       }
     } catch (_) {
-      // Sem rede: mantém o usuário desconhecido mas logado visualmente não.
-      await _tokenStorage.clear();
-      _api.client.setToken(null);
+      // Sem rede ou servidor iniciando: mantém o token salvo para tentar de novo,
+      // em vez de mandar a pessoa para o login.
+      restoreFailed = true;
     }
-    _ready = true;
+    _ready = !restoreFailed;
     notifyListeners();
   }
+
+  /// O login salvo não pôde ser conferido (rede/servidor), mas o token continua
+  /// guardado: a abertura do app oferece "Tentar novamente".
+  bool restoreFailed = false;
 
   Future<bool> login(String email, String password) async {
     _pendingVerificationEmail = null;
