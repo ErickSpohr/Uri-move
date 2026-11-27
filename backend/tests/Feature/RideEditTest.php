@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\RideRequest;
 use App\Models\User;
 use App\Models\UserNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,5 +57,29 @@ class RideEditTest extends TestCase
         $this->patchJson("/api/v1/rides/{$rideId}/requests/{$requestId}", ['action' => 'accepted'])->assertOk();
 
         $this->putJson("/api/v1/rides/{$rideId}", ['total_seats' => 1])->assertUnprocessable();
+    }
+
+    public function test_failed_accept_does_not_store_agreed_price(): void
+    {
+        $driver = User::factory()->create();
+        Sanctum::actingAs($driver);
+        $rideId = $this->postJson('/api/v1/rides', [
+            'origin' => 'Cerro Largo', 'destination' => 'URI', 'price' => 10,
+            'departure_date' => now()->addDay()->toDateString(), 'departure_time' => '07:30',
+            'total_seats' => 1,
+        ])->json('ride.id');
+
+        $ids = [];
+        foreach (User::factory()->count(2)->create() as $passenger) {
+            Sanctum::actingAs($passenger);
+            $ids[] = $this->postJson("/api/v1/rides/{$rideId}/requests", ['pickup_lat' => -28.15, 'pickup_lng' => -54.74])->json('request.id');
+        }
+
+        Sanctum::actingAs($driver);
+        $this->patchJson("/api/v1/rides/{$rideId}/requests/{$ids[0]}", ['action' => 'accepted', 'price' => 8])->assertOk();
+        $this->patchJson("/api/v1/rides/{$rideId}/requests/{$ids[1]}", ['action' => 'accepted', 'price' => 7])->assertUnprocessable();
+
+        $this->assertSame(8.0, RideRequest::find($ids[0])->agreed_price);
+        $this->assertNull(RideRequest::find($ids[1])->agreed_price);
     }
 }
