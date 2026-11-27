@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// Lugar sugerido no autocompletar de endereço.
@@ -67,22 +68,92 @@ class PlaceSearch {
     return buffer.toString().toLowerCase();
   }
 
+  /// No app nativo o cliente HTTP se identifica como "Dart/…", que serviços
+  /// públicos de mapas podem recusar; o navegador já envia o próprio.
+  static const Map<String, String> _headers = kIsWeb
+      ? {}
+      : {'User-Agent': 'URIMove/1.0 (app de caronas da URI; Android)'};
+
+  /// Photon primeiro (melhor para autocompletar); se falhar, Nominatim.
   Future<List<PlaceSuggestion>> search(
     String query, {
     (double, double)? near,
   }) async {
     final bias = near ?? defaultBias;
-    final uri = Uri.https('photon.komoot.io', '/api/', {
+    try {
+      final uri = Uri.https('photon.komoot.io', '/api/', {
+        'q': query,
+        'limit': '8',
+        'lat': '${bias.$1}',
+        'lon': '${bias.$2}',
+      });
+      final response = await _client
+          .get(uri, headers: _headers)
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200) {
+        throw Exception('Photon ${response.statusCode}');
+      }
+      return parsePhoton(jsonDecode(response.body) as Map<String, dynamic>);
+    } catch (_) {
+      return _searchNominatim(query, bias);
+    }
+  }
+
+  Future<List<PlaceSuggestion>> _searchNominatim(
+    String query,
+    (double, double) bias,
+  ) async {
+    const delta = 0.6;
+    final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
       'q': query,
+      'format': 'jsonv2',
+      'addressdetails': '1',
       'limit': '8',
-      'lat': '${bias.$1}',
-      'lon': '${bias.$2}',
+      'countrycodes': 'br',
+      // Preferência (não restrição) pela região ao redor do usuário.
+      'viewbox':
+          '${bias.$2 - delta},${bias.$1 + delta},${bias.$2 + delta},${bias.$1 - delta}',
+      'bounded': '0',
     });
-    final response = await _client.get(uri).timeout(const Duration(seconds: 8));
+    final response = await _client
+        .get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 8));
     if (response.statusCode != 200) {
       throw Exception('Busca de lugares falhou (${response.statusCode}).');
     }
-    return parsePhoton(jsonDecode(response.body) as Map<String, dynamic>);
+    return parseNominatim(jsonDecode(response.body) as List);
+  }
+
+  /// Converte resultados do Nominatim em rótulos curtos (nome, rua, bairro, cidade).
+  static List<PlaceSuggestion> parseNominatim(List<dynamic> json) {
+    final seen = <String>{};
+    final results = <PlaceSuggestion>[];
+    for (final item in json) {
+      final place = Map<String, dynamic>.from(item as Map);
+      final address = Map<String, dynamic>.from(place['address'] as Map? ?? const {});
+      final lat = double.tryParse('${place['lat']}');
+      final lng = double.tryParse('${place['lon']}');
+      if (lat == null || lng == null) continue;
+
+      final name = place['name'] as String?;
+      final road = address['road'] as String?;
+      final street = [road, address['house_number']].whereType<String>().join(', ');
+      final district = (address['suburb'] ?? address['neighbourhood']) as String?;
+      final city = (address['city'] ?? address['town'] ?? address['village'] ??
+          address['municipality']) as String?;
+      final parts = <String>[
+        if (name != null && name.isNotEmpty && name != road) name,
+        if (street.isNotEmpty) street,
+        if (district != null) district,
+        if (city != null && city != name) city,
+      ];
+      final label = parts.isEmpty
+          ? (place['display_name'] as String? ?? '')
+          : parts.join(' - ');
+      if (label.isEmpty || !seen.add(label)) continue;
+      results.add(PlaceSuggestion(label, lat, lng));
+    }
+    return results;
   }
 
   /// Converte o GeoJSON do Photon em sugestões legíveis, só do Brasil e sem repetição.
