@@ -44,9 +44,14 @@ class ChatUnreadController extends Controller
             ->map(fn ($row) => ['ride_id' => (int) $row->ride_id, 'count' => (int) $row->count])
             ->values();
 
+        // Só conversas de caronas ainda abertas: as de caronas encerradas não
+        // aparecem na lista de conversas e deixariam o contador preso.
         $private = Message::query()
             ->where('receiver_id', $userId)
             ->whereNull('read_at')
+            ->whereIn('ride_id', Ride::query()
+                ->whereNotIn('status', [Ride::STATUS_CANCELLED, Ride::STATUS_COMPLETED])
+                ->select('id'))
             ->groupBy('ride_id', 'sender_id')
             ->selectRaw('ride_id, sender_id, count(*) as count')
             ->get()
