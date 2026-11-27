@@ -336,6 +336,9 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                           '${_vehicles.map((v) => v.id).join(',')}:${_vehicle?.id}',
                         ),
                         initialValue: _vehicle,
+                        // Ocupa a largura do campo: sem isso o texto do
+                        // veículo escolhido passava da borda.
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Veículo',
                           prefixIcon: Icon(Icons.directions_car_outlined),
@@ -345,7 +348,9 @@ class _CreateRideScreenState extends State<CreateRideScreen> {
                             DropdownMenuItem(
                               value: v,
                               child: Text(
-                                '${v.label} · ${v.plate ?? ''}',
+                                [v.model, if (v.plate != null && v.plate!.isNotEmpty) v.plate]
+                                    .join(' · '),
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),

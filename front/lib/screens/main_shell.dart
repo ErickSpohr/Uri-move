@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../core/permissions.dart';
 import '../services/native_push.dart';
 import '../state/auth_controller.dart';
 import 'create_ride_screen.dart';
@@ -35,8 +37,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final auth = context.read<AuthController>();
     // Retoma o envio da posição se o motorista tiver carona em andamento.
     auth.locationSharer.sync();
-    // App Android: registra o aparelho para notificações com o app fechado.
-    NativePush.register(auth.api);
+    // Primeiro a localização (mapa, endereço, rastreamento), depois as
+    // notificações: o Android só exibe uma caixa de permissão por vez.
+    unawaited(() async {
+      await AppPermissions.requestLocation().catchError((_) => LocationPermission.denied);
+      await NativePush.register(auth.api);
+    }());
   }
 
   @override

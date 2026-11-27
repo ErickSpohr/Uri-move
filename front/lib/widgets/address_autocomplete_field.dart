@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/permissions.dart';
 import '../screens/pickup_picker_screen.dart';
 import '../services/place_search.dart';
 
@@ -253,7 +254,7 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
       }
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await AppPermissions.requestLocation();
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {

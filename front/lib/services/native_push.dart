@@ -10,6 +10,7 @@ import '../screens/ride_chat_screen.dart';
 import '../screens/ride_detail_screen.dart';
 import '../widgets/in_app_notification.dart';
 import 'api_repository.dart';
+import '../core/permissions.dart';
 
 /// Notificações do app Android via Firebase Cloud Messaging.
 ///
@@ -68,7 +69,8 @@ class NativePush {
         return false;
       }
       final messaging = FirebaseMessaging.instance;
-      final settings = await messaging.requestPermission();
+      // Na fila: não disputa a caixa de permissão com a localização.
+      final settings = await AppPermissions.serial(messaging.requestPermission);
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         lastError = 'Notificações bloqueadas nas configurações do Android.';
         return false;
