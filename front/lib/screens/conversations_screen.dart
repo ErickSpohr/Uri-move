@@ -111,6 +111,39 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         }
       }
 
+      // Conversas privadas com mensagens não lidas que não entraram acima
+      // (ex.: pedido já aceito): sem isso o contador da aba ficava preso.
+      final listed = {
+        for (final c in conversations)
+          if (c.peer != null) ChatUnread.privateKey(c.ride.id, c.peer!.id),
+      };
+      final knownRides = {
+        for (final ride in [...driven, ...joined]) ride.id: ride,
+        for (final request in requests)
+          if (request.ride != null) request.rideId: request.ride!,
+      };
+      for (final key in widget.unread.private.keys) {
+        if (listed.contains(key)) continue;
+        final [rideId, userId] = key.split(':').map(int.parse).toList();
+        try {
+          final ride = knownRides[rideId] ?? await api.ride(rideId);
+          final peer = ride.driver.id == userId
+              ? ride.driver
+              : await api.userProfile(userId);
+          conversations.insert(
+            0,
+            _Conversation(
+              ride: ride,
+              peer: peer,
+              title: peer.name,
+              detail: 'Mensagem privada · ${ride.origin} → ${ride.destination}',
+            ),
+          );
+        } catch (_) {
+          // Carona ou usuário inacessível: ignora esta conversa.
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _conversations = conversations;
