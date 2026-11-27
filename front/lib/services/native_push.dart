@@ -29,6 +29,7 @@ class NativePush {
   static StreamSubscription<RemoteMessage>? _foreground;
   static StreamSubscription<RemoteMessage>? _opened;
   static ApiRepository? _api;
+  static bool _initialHandled = false;
 
   /// Navegador raiz: com o app aberto o Android não exibe a notificação na
   /// barra, então ela é mostrada no topo da tela (overlay do navegador).
@@ -90,8 +91,13 @@ class NativePush {
       _opened ??= FirebaseMessaging.onMessageOpenedApp.listen(
         (message) => open(message.data),
       );
-      final initial = await messaging.getInitialMessage();
-      if (initial != null) open(initial.data);
+      // Notificação que abriu o app fechado: tratada uma única vez (register
+      // também roda no botão "Testar").
+      if (!_initialHandled) {
+        _initialHandled = true;
+        final initial = await messaging.getInitialMessage();
+        if (initial != null) open(initial.data);
+      }
       lastError = null;
       return true;
     } catch (error) {

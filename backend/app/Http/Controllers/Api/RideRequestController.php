@@ -103,8 +103,7 @@ class RideRequestController extends Controller
                 422,
                 'O valor não pode passar do sugerido (R$ '.number_format($suggested, 2, ',', '.').').',
             );
-            $rideRequest->update(['agreed_price' => $price]);
-            $this->accept($ride, $rideRequest);
+            $this->accept($ride, $rideRequest, $price);
         } else {
             $this->reject($ride, $rideRequest);
         }
@@ -143,9 +142,9 @@ class RideRequestController extends Controller
         return response()->json(['message' => 'Solicitação cancelada.']);
     }
 
-    private function accept(Ride $ride, RideRequest $rideRequest): void
+    private function accept(Ride $ride, RideRequest $rideRequest, ?float $price = null): void
     {
-        DB::transaction(function () use ($ride, $rideRequest) {
+        DB::transaction(function () use ($ride, $rideRequest, $price) {
             // Bloqueia carona e solicitação até o commit: aceitações simultâneas são serializadas
             // e a verificação de vagas/status usa valores atuais do banco.
             $ride = Ride::whereKey($ride->id)->lockForUpdate()->firstOrFail();
@@ -154,9 +153,11 @@ class RideRequestController extends Controller
             abort_if($rideRequest->status !== RideRequest::STATUS_PENDING, 422, 'Essa solicitação já foi respondida.');
             abort_if($rideRequest->seats_requested > $ride->available_seats, 422, 'Não há vagas suficientes para aceitar esta solicitação.');
 
+            // Valor combinado gravado junto com o aceite (nada muda se o aceite falhar).
             $rideRequest->update([
                 'status' => RideRequest::STATUS_ACCEPTED,
                 'responded_at' => now(),
+                'agreed_price' => $price,
             ]);
 
             RidePassenger::updateOrCreate(

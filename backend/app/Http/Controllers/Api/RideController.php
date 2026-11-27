@@ -278,12 +278,6 @@ class RideController extends Controller
     public function update(UpdateRideRequest $request, Ride $ride): JsonResponse
     {
         $this->authorizeRideDriver($request, $ride);
-        abort_if($ride->status !== Ride::STATUS_SCHEDULED, 422, 'Só é possível editar caronas que ainda não começaram.');
-        abort_if(
-            $ride->passengers()->where('status', RidePassenger::STATUS_CONFIRMED)->exists(),
-            422,
-            'Não é possível editar depois de aceitar um passageiro. Cancele e publique de novo se precisar mudar.',
-        );
 
         $data = $request->validated();
         if (isset($data['total_seats'])) {
@@ -294,6 +288,14 @@ class RideController extends Controller
         }
 
         $pending = DB::transaction(function () use ($ride, $data) {
+            // Mesmo bloqueio do aceite: edição e aceite simultâneos não se sobrepõem.
+            $ride = Ride::whereKey($ride->id)->lockForUpdate()->firstOrFail();
+            abort_if($ride->status !== Ride::STATUS_SCHEDULED, 422, 'Só é possível editar caronas que ainda não começaram.');
+            abort_if(
+                $ride->passengers()->where('status', RidePassenger::STATUS_CONFIRMED)->exists(),
+                422,
+                'Não é possível editar depois de aceitar um passageiro. Cancele e publique de novo se precisar mudar.',
+            );
             $ride->update($data);
             $pending = $ride->requests()->with('passenger')->where('status', RideRequest::STATUS_PENDING)->get();
 
