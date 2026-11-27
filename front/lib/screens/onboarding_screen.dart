@@ -30,8 +30,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     (
       Icons.directions_car_rounded,
       'Encontre ou ofereça',
-      'Procure caronas pelo destino e horário, ou ofereça a sua e publique '
-          'a semana inteira de uma vez.',
+      'Procure caronas pelo destino e horário, ou ofereça a sua.',
     ),
     (
       Icons.local_gas_station_rounded,
