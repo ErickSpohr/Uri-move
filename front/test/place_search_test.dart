@@ -33,4 +33,22 @@ void main() {
     expect(places.single.label, 'Rua Antunes Ribas, 1200 - Centro - Santo Ângelo');
     expect(places.single.latitude, -28.31264);
   });
+
+  test('Nominatim (reserva): rótulo curto com nome, rua e cidade', () {
+    final places = PlaceSearch.parseNominatim([
+      {
+        'lat': '-28.27718',
+        'lon': '-54.27096',
+        'name': 'URI',
+        'display_name': 'URI, Rua Universidade das Missões, Santo Ângelo, RS, Brasil',
+        'address': {
+          'road': 'Rua Universidade das Missões',
+          'city': 'Santo Ângelo',
+        },
+      },
+    ]);
+
+    expect(places.single.label, 'URI - Rua Universidade das Missões - Santo Ângelo');
+    expect(places.single.longitude, -54.27096);
+  });
 }

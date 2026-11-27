@@ -425,7 +425,8 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
                     ListTile(
                       dense: true,
                       leading: Icon(Icons.wifi_off, color: scheme.error),
-                      title: const Text('Busca indisponível no momento.'),
+                      title: const Text('Não foi possível buscar sugestões agora.'),
+                      subtitle: const Text('Use "Marcar no mapa" para escolher o local.'),
                     ),
                 ],
               ),
