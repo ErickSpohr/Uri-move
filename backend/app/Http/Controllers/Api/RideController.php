@@ -13,6 +13,7 @@ use App\Models\RideRequest;
 use App\Models\Vehicle;
 use App\Services\NotificationService;
 use App\Services\Pricing\RidePricing;
+use App\Services\RideAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -152,6 +153,9 @@ class RideController extends Controller
             fn (string $date) => Ride::create(['departure_date' => $date] + $data),
         ));
         $ride = $rides->first();
+
+        // Avisa quem pediu "Me avise quando aparecer" (uma vez por publicação).
+        app(RideAlertService::class)->notifyMatches($ride, $request->user());
 
         return response()->json([
             'message' => $rides->count() > 1

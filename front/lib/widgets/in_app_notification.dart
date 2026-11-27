@@ -21,6 +21,7 @@ class InAppNotification {
     'driver_arrived' => Icons.place_rounded,
     'rating_received' => Icons.star_rounded,
     'ride_updated' => Icons.edit_calendar_rounded,
+    'ride_alert' => Icons.notifications_active_rounded,
     _ => Icons.notifications_rounded,
   };
 

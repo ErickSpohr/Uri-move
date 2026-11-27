@@ -525,3 +525,35 @@ class PriceQuote {
     estimated: json['estimated'] as bool? ?? false,
   );
 }
+
+/// Aviso "Me avise quando aparecer": busca salva que gera notificação.
+class RideAlert {
+  const RideAlert({
+    required this.id,
+    this.origin,
+    this.destination,
+    this.fromTime,
+    this.toTime,
+  });
+
+  final int id;
+  final String? origin;
+  final String? destination;
+  final String? fromTime;
+  final String? toTime;
+
+  /// Ex.: "Cerro Largo → URI · 18:00–23:59".
+  String get description {
+    final route = '${origin ?? 'Qualquer origem'} → ${destination ?? 'qualquer destino'}';
+    if (fromTime == null && toTime == null) return route;
+    return '$route · ${fromTime ?? '00:00'}–${toTime ?? '23:59'}';
+  }
+
+  factory RideAlert.fromJson(Map<String, dynamic> json) => RideAlert(
+    id: json['id'] as int,
+    origin: json['origin'] as String?,
+    destination: json['destination'] as String?,
+    fromTime: json['from_time'] as String?,
+    toTime: json['to_time'] as String?,
+  );
+}

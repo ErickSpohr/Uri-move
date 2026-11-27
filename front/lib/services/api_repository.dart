@@ -372,6 +372,38 @@ class ApiRepository {
     );
   }
 
+  // ------------------------------------------------------ Avisos de carona
+  Future<RideAlert> createRideAlert({
+    String? origin,
+    String? destination,
+    String? fromTime,
+    String? toTime,
+  }) async {
+    final json = await client.post(
+      '/ride-alerts',
+      body: {
+        if (origin != null && origin.isNotEmpty) 'origin': origin,
+        if (destination != null && destination.isNotEmpty)
+          'destination': destination,
+        if (fromTime != null) 'from_time': fromTime,
+        if (toTime != null) 'to_time': toTime,
+      },
+    );
+    return RideAlert.fromJson(dataMap(json)['alert'] as Map<String, dynamic>);
+  }
+
+  Future<List<RideAlert>> rideAlerts() async {
+    final json = await client.get('/ride-alerts');
+    return [
+      for (final item in dataList(json))
+        RideAlert.fromJson(Map<String, dynamic>.from(item as Map)),
+    ];
+  }
+
+  Future<void> deleteRideAlert(int id) async {
+    await client.delete('/ride-alerts/$id');
+  }
+
   Future<PriceQuote> rideQuote(int rideId, double lat, double lng) async {
     final json = await client.get(
       '/rides/$rideId/quote',
