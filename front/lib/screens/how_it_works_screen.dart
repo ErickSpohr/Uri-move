@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/project_credit.dart';
+
 /// Ajuda do app (heurística 10 de Nielsen): passo a passo de cada parte.
 class HowItWorksScreen extends StatelessWidget {
   const HowItWorksScreen({super.key});
@@ -108,6 +110,8 @@ class HowItWorksScreen extends StatelessWidget {
                 ],
               ),
             ),
+          const SizedBox(height: 8),
+          const ProjectCredit(),
         ],
       ),
     );
