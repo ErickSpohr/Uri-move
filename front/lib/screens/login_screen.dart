@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../state/auth_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/project_credit.dart';
 import 'main_shell.dart';
 import 'password_recovery_screen.dart';
 import 'register_screen.dart';
@@ -167,6 +168,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: const Text('Esqueci minha senha'),
                     ),
+                    const SizedBox(height: 18),
+                    const ProjectCredit(),
                     if (kDebugMode) ...[
                       const SizedBox(height: 26),
                       const _DemoAccountsHint(),

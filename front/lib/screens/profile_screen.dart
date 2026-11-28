@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../state/auth_controller.dart';
 import '../state/theme_controller.dart';
 import '../widgets/common.dart';
+import '../widgets/project_credit.dart';
 import '../widgets/vehicle_dialog.dart';
 import 'admin_reports_screen.dart';
 import 'blocked_users_screen.dart';
@@ -350,6 +351,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: const Icon(Icons.logout),
                     label: const Text('Sair da conta'),
                   ),
+                  const SizedBox(height: 12),
+                  const ProjectCredit(),
                 ],
               ),
             ),
